@@ -49,8 +49,10 @@ GHL_MOCKUP_IMAGE_FIELD=mockup_image
 
 ## Vercel deploy (one-time setup)
 
-1. Import the GitHub repo in Vercel  
-2. Set these **Project Settings → General**:
+See **[DEPLOY.md](./DEPLOY.md)** for the full checklist.
+
+**Critical:** Root Directory must be `apps/web` — not `apps/backend`.  
+If you see `.next` missing under `apps/backend`, that setting is wrong.
 
 | Setting | Value |
 |--------|--------|
@@ -59,11 +61,7 @@ GHL_MOCKUP_IMAGE_FIELD=mockup_image
 | **Include files outside root** | Enabled |
 | **Install Command** | `cd ../.. && PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --filter @mockup/web...` |
 | **Build Command** | `cd ../.. && pnpm --filter @mockup/web build` |
-
-3. Add the env vars above (Production + Preview)  
-4. Deploy  
-
-> Never set Root Directory to `apps/backend` or `apps/frontend`.
+| **Output Directory** | leave empty |
 
 `@mockup/shared` builds automatically on install (`prepare`) and again via `apps/web` `prebuild`.
 

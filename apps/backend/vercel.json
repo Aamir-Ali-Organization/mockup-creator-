@@ -1,0 +1,3 @@
+{
+  "buildCommand": "echo '' && echo '❌ Wrong Vercel Root Directory: apps/backend' && echo '✅ Fix: Project Settings → General → Root Directory → set to apps/web' && echo '   Then enable \"Include source files outside of the Root Directory\" and Redeploy.' && echo '' && exit 1"
+}

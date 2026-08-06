@@ -1,0 +1,3 @@
+{
+  "buildCommand": "echo '' && echo '❌ Wrong Vercel Root Directory: apps/frontend' && echo '✅ Fix: Project Settings → General → Root Directory → set to apps/web' && echo '' && exit 1"
+}
