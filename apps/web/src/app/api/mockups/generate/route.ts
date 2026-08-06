@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
-import { isGhlReady, upsertLeadInGhl } from '@/lib/ghl';
+import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
 import { canGenerateMockups, generateMockupImage } from '@/lib/openai';
 import { buildPromptFromQuote } from '@/lib/prompt-builder';
 
@@ -78,29 +78,18 @@ export async function POST(request: Request) {
 
     const image = await generateMockupImage(prompt);
 
+    // Never fail the mockup response if GHL update breaks — quote + image already succeeded.
+    let ghlWarning: string | null = null;
     if (isGhlReady()) {
-      await upsertLeadInGhl({
-        fleadid,
-        contactId,
-        customerName: job.customerName,
-        email: job.email,
-        phone: job.phone,
-        teamName: job.teamName,
-        sport: job.sport,
-        gender: job.gender,
-        ageGroup: job.ageGroup,
-        primaryColor: job.primaryColor,
-        secondaryColor: job.secondaryColor,
-        alternateColor: job.alternateColor || '',
-        quantity: job.quantity,
-        accessories: job.accessories,
-        rosterInfo: job.rosterInfo || '',
-        logoCreation: job.logoCreation,
-        referralSource: job.referralSource,
-        mockupGenerated: true,
-        // Store marker; full data URL may be too large for custom fields.
-        mockupImageUrl: 'generated',
-      });
+      try {
+        await markMockupGeneratedInGhl({ contactId, fleadid });
+      } catch (ghlError) {
+        ghlWarning =
+          ghlError instanceof Error
+            ? ghlError.message
+            : 'Could not mark mockup as generated in GHL';
+        console.error('[mockups/generate] GHL update failed:', ghlError);
+      }
     }
 
     return Response.json({
@@ -113,6 +102,7 @@ export async function POST(request: Request) {
       payload,
       imageDataUrl: image.dataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
+      ghlWarning,
     });
   } catch (error) {
     return toErrorResponse(error);

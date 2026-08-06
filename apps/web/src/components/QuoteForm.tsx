@@ -1,39 +1,36 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Controller, FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ACCESSORIES,
   AGE_GROUPS,
   GENDERS,
-  LOGO_CREATION_OPTIONS,
   REFERRAL_SOURCES,
   SPORTS,
   quoteFormSchema,
   type QuoteFormValues,
 } from '@mockup/shared';
-import { resolveLead, saveMockupSession, submitQuote } from '@/lib/api';
+import { buildSuccessPath, resolveLead, saveMockupSession, submitQuote } from '@/lib/api';
+import { formatUsPhone } from '@/lib/phone';
+import { syncFieldsFromDom } from '@/lib/sync-form-dom';
 import { StepProgress } from '@/components/form/StepProgress';
 import { TextField } from '@/components/ui/TextField';
+import { PhoneField } from '@/components/ui/PhoneField';
 import { SelectField } from '@/components/ui/SelectField';
-import { TextAreaField } from '@/components/ui/TextAreaField';
-import { FileField } from '@/components/ui/FileField';
-import { CheckboxTile } from '@/components/ui/CheckboxTile';
+import { TeamColorsSection } from '@/components/form/TeamColorsSection';
+import { ExtrasSection } from '@/components/form/ExtrasSection';
 
-type FormValues = QuoteFormValues & {
-  rosterFile?: FileList;
-  logoFile?: FileList;
-};
+type FormValues = QuoteFormValues;
 
 const STEPS = ['Contact', 'Team Look', 'Extras', 'Submit'] as const;
 
 const stepFields: Record<number, (keyof FormValues)[]> = {
   1: ['customerName', 'phone', 'email', 'teamName', 'sport'],
   2: ['primaryColor', 'secondaryColor', 'gender', 'ageGroup', 'quantity'],
-  3: ['accessories', 'rosterInfo', 'logoCreation'],
+  3: ['accessories', 'rosterInfo', 'logoCreation', 'logoFile'],
   4: ['referralSource', 'consent'],
 };
 
@@ -60,6 +57,9 @@ export function QuoteForm() {
   const methods = useForm<FormValues>({
     resolver: zodResolver(quoteFormSchema),
     mode: 'onTouched',
+    reValidateMode: 'onChange',
+    criteriaMode: 'firstError',
+    shouldFocusError: true,
     defaultValues: {
       customerName: '',
       email: '',
@@ -87,12 +87,22 @@ export function QuoteForm() {
     const entries = Object.entries(prefill) as Array<[keyof FormValues, unknown]>;
     for (const [key, value] of entries) {
       if (value === undefined || value === null || value === '') continue;
-      methods.setValue(key, value as never, { shouldValidate: false, shouldDirty: false });
+      const next =
+        key === 'phone' && typeof value === 'string' ? formatUsPhone(value) : value;
+      methods.setValue(key, next as never, { shouldValidate: false, shouldDirty: false });
     }
   }, [leadQuery.data, methods]);
 
   const mutation = useMutation({
-    mutationFn: submitQuote,
+    mutationFn: async (values: Parameters<typeof submitQuote>[0]) => {
+      const data = await submitQuote(values);
+      if (!data.contactId) {
+        throw new Error(
+          'No GHL lead id returned. Check GHL API key / location settings, then try again.',
+        );
+      }
+      return data;
+    },
     onSuccess: (data) => {
       saveMockupSession({
         contactId: data.contactId,
@@ -101,18 +111,33 @@ export function QuoteForm() {
         shouldGenerate: data.shouldGenerate,
         job: data.job,
       });
-      router.push('/success');
+      // Success is always tied to the GHL contact id for future mockup URL storage.
+      router.push(buildSuccessPath(data.contactId!, data.fleadid));
     },
   });
 
   const next = async () => {
-    const valid = await methods.trigger(stepFields[step], { shouldFocus: true });
-    if (valid) setStep((value) => Math.min(value + 1, STEPS.length));
+    const fields = stepFields[step];
+    // Autofill / fake form fillers often skip React onChange — sync DOM first.
+    syncFieldsFromDom(methods.setValue, fields);
+    const valid = await methods.trigger(fields, { shouldFocus: true });
+    if (!valid) return;
+
+    // Full Zod schema runs on every trigger, so later-step fields (consent, etc.)
+    // get errors early. Clear those until the user actually reaches that step.
+    const futureFields = ([1, 2, 3, 4] as const)
+      .filter((stepNumber) => stepNumber > step)
+      .flatMap((stepNumber) => stepFields[stepNumber]);
+    if (futureFields.length) {
+      methods.clearErrors(futureFields);
+    }
+
+    setStep((value) => Math.min(value + 1, STEPS.length));
   };
 
   const back = () => setStep((value) => Math.max(value - 1, 1));
 
-  const onSubmit = methods.handleSubmit((values) => {
+  const submitQuoteForm = methods.handleSubmit((values) => {
     mutation.mutate({
       ...values,
       rosterFile: methods.getValues('rosterFile'),
@@ -122,8 +147,12 @@ export function QuoteForm() {
     });
   });
 
-  const leadMode = leadQuery.data?.lead.mode || 'new';
-  const mockupAlreadyGenerated = Boolean(leadQuery.data?.lead.mockupAlreadyGenerated);
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const allFields = ([1, 2, 3, 4] as const).flatMap((stepNumber) => stepFields[stepNumber]);
+    syncFieldsFromDom(methods.setValue, allFields);
+    void submitQuoteForm(event);
+  };
 
   const {
     register,
@@ -138,21 +167,6 @@ export function QuoteForm() {
         noValidate
       >
         <StepProgress current={step} total={STEPS.length} labels={[...STEPS]} />
-
-        <div className="mb-4 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/60">
-          {leadQuery.isLoading ? (
-            <span>Checking lead details…</span>
-          ) : fleadid && leadMode === 'existing' ? (
-            <span>
-              Facebook lead linked · details prefilled from GHL
-              {mockupAlreadyGenerated ? ' · mockup already generated (won’t regenerate)' : ''}
-            </span>
-          ) : fleadid ? (
-            <span>Facebook lead id found, but no GHL contact yet — we’ll create one on submit.</span>
-          ) : (
-            <span>Public form · new lead will be saved to GHL on submit.</span>
-          )}
-        </div>
 
         {step === 1 ? (
           <section className="space-y-4">
@@ -170,13 +184,21 @@ export function QuoteForm() {
                 error={errors.customerName?.message}
                 {...register('customerName')}
               />
-              <TextField
-                label="Phone"
-                requiredMark
-                type="tel"
-                placeholder="(239) 555-0100"
-                error={errors.phone?.message}
-                {...register('phone')}
+              <Controller
+                name="phone"
+                control={methods.control}
+                render={({ field }) => (
+                  <PhoneField
+                    label="Phone"
+                    requiredMark
+                    name={field.name}
+                    value={field.value || ''}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                    error={errors.phone?.message}
+                    ref={field.ref}
+                  />
+                )}
               />
               <TextField
                 className="sm:col-span-2"
@@ -214,28 +236,10 @@ export function QuoteForm() {
                 Colors + sizing so we can build the right uniform style.
               </p>
             </div>
+            <TeamColorsSection />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <TextField
-                label="Primary Color"
-                requiredMark
-                placeholder="Red"
-                error={errors.primaryColor?.message}
-                {...register('primaryColor')}
-              />
-              <TextField
-                label="Secondary Color"
-                requiredMark
-                placeholder="Black"
-                error={errors.secondaryColor?.message}
-                {...register('secondaryColor')}
-              />
-              <TextField
-                label="Alternate Color"
-                placeholder="Gold"
-                error={errors.alternateColor?.message}
-                {...register('alternateColor')}
-              />
-              <TextField
+                className="sm:col-span-2"
                 label="How many uniforms?"
                 requiredMark
                 type="number"
@@ -267,42 +271,10 @@ export function QuoteForm() {
             <div>
               <h2 className="m-0 font-display text-3xl tracking-wide text-white">Extras</h2>
               <p className="mt-1 text-sm text-white/55">
-                Optional — skip anything and add later with your rep.
+                Optional extras — skip anything and finish later with your rep.
               </p>
             </div>
-            <div>
-              <p className="field-label mb-2">Popular accessories</p>
-              <div className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                {ACCESSORIES.map((item) => (
-                  <CheckboxTile key={item} label={item} value={item} {...register('accessories')} />
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <TextAreaField
-                className="sm:col-span-2"
-                label="Roster notes"
-                placeholder="Names, numbers, sizes (or attach a file)"
-                {...register('rosterInfo')}
-              />
-              <FileField
-                label="Attach roster"
-                accept=".png,.jpg,.jpeg,.pdf,.docx,.csv,.xlsx,.xls"
-                {...register('rosterFile')}
-              />
-              <FileField
-                label="Attach logo"
-                accept=".png,.jpg,.jpeg,.pdf,.docx,.csv,.xlsx,.xls"
-                {...register('logoFile')}
-              />
-              <SelectField
-                className="sm:col-span-2"
-                label="Need a logo created?"
-                placeholder="Optional"
-                options={LOGO_CREATION_OPTIONS}
-                {...register('logoCreation')}
-              />
-            </div>
+            <ExtrasSection />
           </section>
         ) : null}
 

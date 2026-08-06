@@ -89,14 +89,34 @@ async function ghlFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!response.ok) {
+    const nested =
+      data.meta && typeof data.meta === 'object'
+        ? (data.meta as { message?: unknown }).message
+        : undefined;
     const message =
       (typeof data.message === 'string' && data.message) ||
       (typeof data.error === 'string' && data.error) ||
+      (typeof nested === 'string' && nested) ||
       `GHL API error (${response.status})`;
-    throw new AppError(message, response.status === 401 ? 503 : response.status, data);
+    throw new AppError(
+      message === 'Unprocessable Entity'
+        ? 'GHL rejected the contact update (check phone/custom fields).'
+        : message,
+      response.status === 401 ? 503 : response.status,
+      data,
+    );
   }
 
   return data as T;
+}
+
+/** GHL is picky about phone formatting — send US E.164 when possible. */
+export function toGhlPhone(phone: string): string {
+  let digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length > 0) return `+${digits}`;
+  return phone.trim();
 }
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
@@ -308,32 +328,71 @@ export async function upsertLeadInGhl(input: UpsertLeadInput): Promise<{
       null;
   }
 
-  const payload = {
-    firstName,
-    lastName,
-    name: input.customerName,
-    email: input.email,
-    phone: input.phone,
-    locationId: env.GHL_LOCATION_ID,
-    source: input.fleadid ? 'Facebook Lead Form + Mockup Form' : 'Public Mockup Form',
-    tags: ['mockup-form', input.fleadid ? 'facebook-lead' : 'public-lead'],
-    customFields: buildCustomFields(input),
-  };
+  const customFields = buildCustomFields(input);
+  const phone = toGhlPhone(input.phone);
 
   if (existing?.id) {
+    // Updates are stricter than creates — send only mutable fields (no locationId).
+    const updatePayload = {
+      firstName,
+      lastName,
+      name: input.customerName,
+      email: input.email,
+      phone,
+      source: input.fleadid ? 'Facebook Lead Form + Mockup Form' : 'Public Mockup Form',
+      tags: Array.from(
+        new Set([...(existing.tags || []), 'mockup-form', input.fleadid ? 'facebook-lead' : 'public-lead']),
+      ),
+      customFields,
+    };
     const data = await ghlFetch<{ contact: GhlContact }>(`/contacts/${existing.id}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(updatePayload),
     });
     return { contactId: data.contact.id, created: false, contact: data.contact };
   }
 
   const data = await ghlFetch<{ contact: GhlContact }>('/contacts/', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      firstName,
+      lastName,
+      name: input.customerName,
+      email: input.email,
+      phone,
+      locationId: env.GHL_LOCATION_ID,
+      source: input.fleadid ? 'Facebook Lead Form + Mockup Form' : 'Public Mockup Form',
+      tags: ['mockup-form', input.fleadid ? 'facebook-lead' : 'public-lead'],
+      customFields,
+    }),
   });
 
   return { contactId: data.contact.id, created: true, contact: data.contact };
+}
+
+/** Lightweight follow-up after mockup generation — avoids full contact rewrite. */
+export async function markMockupGeneratedInGhl(input: {
+  contactId?: string | null;
+  fleadid?: string | null;
+}): Promise<void> {
+  if (!isGhlReady()) return;
+
+  let contactId = input.contactId || null;
+  if (!contactId && input.fleadid) {
+    const lead = await resolveLeadByFleadid(input.fleadid);
+    contactId = lead.contactId;
+  }
+  if (!contactId) return;
+
+  await ghlFetch(`/contacts/${contactId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      customFields: [
+        { key: env.GHL_MOCKUP_GENERATED_FIELD, field_value: 'true' },
+        { key: env.GHL_MOCKUP_IMAGE_FIELD, field_value: 'generated' },
+      ],
+    }),
+  });
 }
 
 export function isGhlReady(): boolean {

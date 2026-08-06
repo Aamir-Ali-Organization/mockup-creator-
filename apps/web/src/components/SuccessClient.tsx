@@ -2,27 +2,44 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { generateMockup, loadMockupSession, type MockupSession } from '@/lib/api';
 import { MockupLoader } from '@/components/MockupLoader';
 
 type Phase = 'loading-session' | 'generating' | 'ready' | 'skipped' | 'error' | 'empty';
 
-export function SuccessClient() {
+type SuccessClientProps = {
+  /** GHL contact / lead id from the URL. */
+  contactId?: string;
+};
+
+export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientProps) {
+  const searchParams = useSearchParams();
+  const fleadidFromUrl = (searchParams.get('fleadid') || '').trim() || null;
+
   const [session, setSession] = useState<MockupSession | null>(null);
   const [phase, setPhase] = useState<Phase>('loading-session');
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
+  const ghlContactId = contactIdFromRoute || session?.contactId || null;
+
   useEffect(() => {
-    const stored = loadMockupSession();
+    const stored = loadMockupSession(contactIdFromRoute);
     if (!stored) {
       setPhase('empty');
       return;
     }
-    setSession(stored);
 
-    if (stored.skipMockup || !stored.shouldGenerate) {
+    const merged: MockupSession = {
+      ...stored,
+      contactId: contactIdFromRoute || stored.contactId,
+      fleadid: fleadidFromUrl || stored.fleadid,
+    };
+    setSession(merged);
+
+    if (merged.skipMockup || !merged.shouldGenerate) {
       setPhase('skipped');
       return;
     }
@@ -32,9 +49,9 @@ export function SuccessClient() {
     setPhase('generating');
 
     void generateMockup({
-      contactId: stored.contactId,
-      fleadid: stored.fleadid,
-      job: stored.job,
+      contactId: merged.contactId,
+      fleadid: merged.fleadid,
+      job: merged.job,
     })
       .then((result) => {
         if (result.skipped) {
@@ -53,15 +70,15 @@ export function SuccessClient() {
         setError(err instanceof Error ? err.message : 'Mockup generation failed');
         setPhase('error');
       });
-  }, []);
+  }, [contactIdFromRoute, fleadidFromUrl]);
 
   const retry = () => {
     if (!session) return;
     setError(null);
     setPhase('generating');
     void generateMockup({
-      contactId: session.contactId,
-      fleadid: session.fleadid,
+      contactId: ghlContactId || session.contactId,
+      fleadid: fleadidFromUrl || session.fleadid,
       job: session.job,
       force: true,
     })
@@ -86,7 +103,7 @@ export function SuccessClient() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:p-8">
           <h1 className="m-0 font-display text-4xl tracking-wide text-white">No quote found</h1>
           <p className="mt-3 text-sm text-white/60">
-            Submit the quote form first — your mockup session lives in this browser tab.
+            Submit the quote form first — your mockup session is tied to the GHL lead id in this URL.
           </p>
           <Link href="/" className="btn-primary mt-6 inline-flex">
             Start a quote
@@ -126,16 +143,20 @@ export function SuccessClient() {
               <dt className="text-white/45">Quantity</dt>
               <dd className="font-semibold text-white">{job.quantity}</dd>
             </div>
+            {ghlContactId ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-white/45">GHL Lead</dt>
+                <dd className="truncate font-mono text-xs font-semibold text-accent">
+                  {ghlContactId}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         ) : null}
 
         <div className="mt-6">
           {phase === 'loading-session' || phase === 'generating' ? (
-            <MockupLoader
-              teamName={job?.teamName}
-              sport={job?.sport}
-              done={false}
-            />
+            <MockupLoader teamName={job?.teamName} sport={job?.sport} done={false} />
           ) : null}
 
           {phase === 'ready' && imageDataUrl ? (
@@ -182,14 +203,22 @@ export function SuccessClient() {
           ) : null}
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <a href="tel:2398391588" className="btn-primary w-full sm:w-auto">
-            Call Matt Now
-          </a>
-          <Link href="/" className="btn-ghost w-full sm:w-auto">
-            Submit another quote
-          </Link>
-        </div>
+        {phase === 'loading-session' || phase === 'generating' ? (
+          <div className="mt-8 flex justify-center">
+            <a href="tel:2398391588" className="btn-primary w-full max-w-xs sm:w-auto">
+              Call Matt Now
+            </a>
+          </div>
+        ) : (
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a href="tel:2398391588" className="btn-primary w-full sm:w-auto">
+              Call Matt Now
+            </a>
+            <Link href="/" className="btn-ghost w-full sm:w-auto">
+              Submit another quote
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

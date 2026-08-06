@@ -66,6 +66,10 @@ export type MockupSession = {
   job: MockupJob;
 };
 
+function sessionStorageKey(contactId?: string | null) {
+  return contactId ? `${MOCKUP_SESSION_KEY}:${contactId}` : MOCKUP_SESSION_KEY;
+}
+
 async function parseError(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as {
@@ -145,15 +149,31 @@ export async function generateMockup(payload: {
 }
 
 export function saveMockupSession(session: MockupSession) {
-  sessionStorage.setItem(MOCKUP_SESSION_KEY, JSON.stringify(session));
+  const payload = JSON.stringify(session);
+  sessionStorage.setItem(sessionStorageKey(session.contactId), payload);
+  // Keep a latest pointer for `/success` fallback redirects.
+  sessionStorage.setItem(MOCKUP_SESSION_KEY, payload);
 }
 
-export function loadMockupSession(): MockupSession | null {
+export function loadMockupSession(contactId?: string | null): MockupSession | null {
   try {
-    const raw = sessionStorage.getItem(MOCKUP_SESSION_KEY);
+    const raw =
+      sessionStorage.getItem(sessionStorageKey(contactId)) ||
+      sessionStorage.getItem(MOCKUP_SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as MockupSession;
+    const session = JSON.parse(raw) as MockupSession;
+    if (contactId && session.contactId && session.contactId !== contactId) {
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
+}
+
+export function buildSuccessPath(contactId: string, fleadid?: string | null) {
+  const params = new URLSearchParams();
+  if (fleadid) params.set('fleadid', fleadid);
+  const query = params.toString();
+  return `/success/${encodeURIComponent(contactId)}${query ? `?${query}` : ''}`;
 }

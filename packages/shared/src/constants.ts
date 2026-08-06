@@ -24,6 +24,41 @@ export const LOGO_CREATION_OPTIONS = [
   'Not sure yet',
 ] as const;
 
+/** Option that requires a logo file upload. */
+export const LOGO_ATTACH_OPTION = LOGO_CREATION_OPTIONS[1];
+
+export const ACCESSORY_GROUPS = [
+  {
+    title: 'Gear',
+    items: [
+      'Football Receiver Gloves',
+      'Sports Sleeve',
+      'Headband',
+      'Headgear',
+      'Socks',
+      'Beanie',
+    ],
+  },
+  {
+    title: 'Bags',
+    items: ['Backpack', 'Duffle Bag', 'Drawstring Bag'],
+  },
+  {
+    title: 'Apparel',
+    items: [
+      'Baseball Hat',
+      "Coach's Polo",
+      'Sweatsuit',
+      'Sweat Pants',
+      "Dri Fit Coach's Hoodie",
+    ],
+  },
+  {
+    title: 'Flags',
+    items: ['Flag Football Popper Flags', 'Flag Football Triple Threat Flags'],
+  },
+] as const;
+
 export const REFERRAL_SOURCES = [
   'Instagram',
   'TikTok',

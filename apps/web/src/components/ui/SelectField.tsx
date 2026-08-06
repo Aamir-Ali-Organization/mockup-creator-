@@ -21,7 +21,17 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         {label}
         {requiredMark ? <span className="ml-1 text-heat">*</span> : null}
       </label>
-      <select ref={ref} id={fieldId} className="input-field pr-10" {...props}>
+      <select
+        ref={ref}
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        className={`input-field pr-10 ${error ? 'border-heat/70 focus:border-heat focus:shadow-[0_0_0_4px_rgba(227,6,19,0.18)]' : ''}`}
+        {...props}
+        onFocus={(event) => {
+          props.onChange?.(event);
+          props.onFocus?.(event);
+        }}
+      >
         <option value="">{placeholder}</option>
         {options.map((option) => (
           <option key={option} value={option}>
@@ -29,8 +39,12 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
           </option>
         ))}
       </select>
-      {hint ? <p className="m-0 text-[0.8rem] text-white/45">{hint}</p> : null}
-      {error ? <p className="m-0 text-sm font-medium text-heat">{error}</p> : null}
+      {hint && !error ? <p className="m-0 text-[0.8rem] text-white/45">{hint}</p> : null}
+      {error ? (
+        <p className="m-0 text-sm font-medium text-heat" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 });

@@ -53,4 +53,13 @@ body {
   .btn-ghost {
     @apply inline-flex items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:opacity-50;
   }
+
+  .color-swatch-row {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .color-swatch-row::-webkit-scrollbar {
+    display: none;
+  }
 }

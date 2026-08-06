@@ -51,10 +51,23 @@ export async function generateMockupImage(prompt: string): Promise<{
     throw new AppError('OpenAI image response missing url and b64_json', 502);
   } catch (error) {
     if (error instanceof AppError) throw error;
-    const message =
-      error && typeof error === 'object' && 'message' in error
-        ? String((error as { message: unknown }).message)
-        : 'OpenAI image generation failed';
-    throw new AppError(message, 502);
+
+    const apiError = error as {
+      message?: unknown;
+      status?: unknown;
+      error?: { message?: unknown };
+    };
+    const detail =
+      (typeof apiError.error?.message === 'string' && apiError.error.message) ||
+      (typeof apiError.message === 'string' && apiError.message) ||
+      'OpenAI image generation failed';
+    const status = typeof apiError.status === 'number' ? apiError.status : 502;
+
+    throw new AppError(
+      detail === 'Unprocessable Entity'
+        ? 'OpenAI could not process this mockup request. Try again or simplify team details.'
+        : detail,
+      status >= 400 && status < 600 ? status : 502,
+    );
   }
 }

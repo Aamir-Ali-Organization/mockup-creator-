@@ -19,9 +19,24 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         {label}
         {requiredMark ? <span className="ml-1 text-heat">*</span> : null}
       </label>
-      <input ref={ref} id={fieldId} className="input-field" {...props} />
-      {hint ? <p className="m-0 text-[0.8rem] text-white/45">{hint}</p> : null}
-      {error ? <p className="m-0 text-sm font-medium text-heat">{error}</p> : null}
+      <input
+        ref={ref}
+        id={fieldId}
+        aria-invalid={error ? true : undefined}
+        className={`input-field ${error ? 'border-heat/70 focus:border-heat focus:shadow-[0_0_0_4px_rgba(227,6,19,0.18)]' : ''}`}
+        {...props}
+        onFocus={(event) => {
+          // Autofill may fill DOM without React onChange — sync on focus.
+          props.onChange?.(event);
+          props.onFocus?.(event);
+        }}
+      />
+      {hint && !error ? <p className="m-0 text-[0.8rem] text-white/45">{hint}</p> : null}
+      {error ? (
+        <p className="m-0 text-sm font-medium text-heat" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 });
