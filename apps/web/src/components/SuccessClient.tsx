@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -164,10 +165,14 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
               <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-medium text-accent">
                 Your free mockup is ready — check the drip.
               </div>
-              <img
+              <Image
                 src={imageDataUrl}
                 alt={`${job?.teamName || 'Team'} uniform mockup`}
-                className="w-full rounded-xl border border-white/10"
+                width={1024}
+                height={1024}
+                unoptimized
+                className="h-auto w-full rounded-xl border border-white/10"
+                priority
               />
               <p className="text-sm text-white/55">
                 Preview only — final production art is refined by our design team.
