@@ -8,7 +8,7 @@
     "build": "pnpm --filter @mockup/shared build && prisma generate --schema=./prisma/schema.prisma && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "postinstall": "prisma generate --schema=./prisma/schema.prisma",
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma || echo \"Prisma generate skipped (ok if not using legacy backend)\"",
     "db:generate": "prisma generate --schema=./prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema=./prisma/schema.prisma",
     "db:migrate:dev": "prisma migrate dev --schema=./prisma/schema.prisma",

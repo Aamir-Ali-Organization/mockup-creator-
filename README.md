@@ -7,34 +7,32 @@ Big Mad Drip campaign quote form + free AI uniform mockup. **Next.js** app (no d
 - **App:** Next.js 15 (App Router), TypeScript, TailwindCSS, React Hook Form, TanStack Query
 - **Integrations:** GoHighLevel Contacts API, OpenAI Images (`gpt-image-1`)
 - **Shared:** Zod schemas + constants (`packages/shared`)
-- **Deploy:** Vercel (set `maxDuration` 60s on generate route)
+- **Deploy:** Vercel
 
 ## Project structure
 
 ```text
 apps/
-  web/          Next.js app (form + API routes) ← primary
-  frontend/     Legacy Vite UI
-  backend/      Legacy Fastify + Postgres
+  web/          Next.js app (form + API routes) ← deploy this
+  frontend/     Legacy Vite UI (ignore for deploy)
+  backend/      Legacy Fastify + Postgres (ignore for deploy)
 packages/
   shared/       Shared Zod schemas and constants
 ```
 
-## Quick start (Next.js)
+## Quick start
 
 ```bash
 pnpm install
-pnpm --filter @mockup/shared build
-
-# Env for the Next app (from root .env)
-cp .env apps/web/.env.local
-
+cp .env.example apps/web/.env.local   # or copy from root .env
 pnpm dev
 ```
 
 Open http://localhost:3000
 
-Required env vars in `apps/web/.env.local`:
+## Environment variables
+
+Copy `apps/web/.env.example` → `apps/web/.env.local` (and the same keys into Vercel):
 
 ```bash
 OPENAI_API_KEY=sk-...
@@ -49,74 +47,37 @@ GHL_MOCKUP_GENERATED_FIELD=mockup_generated
 GHL_MOCKUP_IMAGE_FIELD=mockup_image
 ```
 
-No Postgres required.
+## Vercel deploy (one-time setup)
 
-## Lead flow (Facebook → GHL → Mockup form)
-
-URL examples:
-
-- Public traffic: `https://your-domain/`
-- Facebook follow-up: `https://your-domain/?fleadid=FACEBOOK_LEAD_ID`
-
-Also accepted: `fLeadId`, `leadId`, `facebookLeadId`.
-
-Behavior:
-
-1. No `fleadid` → public form → create **new GHL contact** on submit
-2. `fleadid` found in GHL → prefill form from contact
-3. `fleadid` present but contact missing → treat as new lead → create GHL contact on submit
-4. If contact already has `mockup_generated=true` → do **not** call OpenAI again
-5. After submit → success page with fancy loader while the mockup generates (~30–60s)
-
-## API routes (Next.js)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/leads/resolve` | Prefill from GHL by `fleadid` |
-| `POST` | `/api/submit` | Upsert GHL contact + return mockup job |
-| `POST` | `/api/mockups/generate` | Generate AI mockup image (`maxDuration` 60) |
-
-## Vercel deploy
-
-Deploy the **Next.js** app — not the legacy Fastify backend.
-
-### Project settings (important)
+1. Import the GitHub repo in Vercel  
+2. Set these **Project Settings → General**:
 
 | Setting | Value |
 |--------|--------|
 | **Root Directory** | `apps/web` |
-| **Framework** | Next.js |
+| **Framework Preset** | Next.js |
+| **Include files outside root** | Enabled |
 | **Install Command** | `cd ../.. && PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --filter @mockup/web...` |
-| **Build Command** | `cd ../.. && pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build` |
-| **Output** | leave default (Next.js) |
+| **Build Command** | `cd ../.. && pnpm --filter @mockup/web build` |
 
-> If Root Directory is `apps/backend`, the build fails / pulls Prisma + Fastify — change it to `apps/web`.
-> Use `--filter @mockup/web...` so legacy backend packages are **not** installed on Vercel.
+3. Add the env vars above (Production + Preview)  
+4. Deploy  
 
-Also enable **“Include source files outside of the Root Directory in the Build Step”** so the monorepo `packages/shared` is available.
+> Never set Root Directory to `apps/backend` or `apps/frontend`.
 
-### Environment variables
+`@mockup/shared` builds automatically on install (`prepare`) and again via `apps/web` `prebuild`.
 
-Add the same vars as `.env.local` in the Vercel project (Production + Preview).
+## Lead flow
 
-Use a plan that allows **60s** function duration for `/api/mockups/generate`.
+- Public: `https://your-domain/`
+- Facebook: `https://your-domain/?fleadid=FACEBOOK_LEAD_ID`
+- After submit: `/success/{ghlContactId}`
 
 ## Scripts
 
 ```bash
-pnpm dev            # Next.js app (apps/web)
-pnpm build          # shared + web
-pnpm start          # production Next server
+pnpm dev            # Next.js app
+pnpm build          # production build (web only)
+pnpm start          # start production server
 pnpm dev:legacy     # old Vite + Fastify stack
 ```
-
-## Legacy Docker stack
-
-Still available if needed:
-
-```bash
-docker compose up --build
-```
-
-- Frontend: http://localhost:8088
-- Backend: http://localhost:3001

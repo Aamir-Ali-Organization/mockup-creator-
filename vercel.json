@@ -1,5 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --filter @mockup/web...",
-  "buildCommand": "pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build"
+  "buildCommand": "pnpm --filter @mockup/web build"
 }

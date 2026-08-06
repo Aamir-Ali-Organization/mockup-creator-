@@ -1,0 +1,13 @@
+apps/backend
+apps/frontend
+legacy
+uploads
+assets
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/.next
+**/dist
+**/.git
+docker-compose.yml
