@@ -1,0 +1,32 @@
+{
+  "name": "mockup-generator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @mockup/shared build && pnpm --filter @mockup/web dev",
+    "dev:web": "pnpm --filter @mockup/web dev",
+    "dev:legacy": "pnpm -r --parallel --filter @mockup/backend --filter @mockup/frontend run dev",
+    "dev:frontend": "pnpm --filter @mockup/frontend dev",
+    "dev:backend": "pnpm --filter @mockup/backend dev",
+    "build": "pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build",
+    "build:legacy": "pnpm --filter @mockup/shared build && pnpm --filter @mockup/backend build && pnpm --filter @mockup/frontend build",
+    "start": "pnpm --filter @mockup/web start",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "db:generate": "pnpm --filter @mockup/backend db:generate",
+    "db:migrate": "pnpm --filter @mockup/backend db:migrate",
+    "db:push": "pnpm --filter @mockup/backend db:push"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.24.0",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.1",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.3"
+  }
+}

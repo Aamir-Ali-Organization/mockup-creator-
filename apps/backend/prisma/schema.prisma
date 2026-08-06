@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuoteStatus {
+  PENDING
+  PROCESSING
+  MOCKUP_READY
+  COMPLETED
+  CANCELLED
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  customerName    String
+  email           String
+  phone           String
+  teamName        String
+  sport           String
+  gender          String
+  ageGroup        String
+  primaryColor    String
+  secondaryColor  String
+  alternateColor  String      @default("")
+  quantity        Int
+  accessories     String[]    @default([])
+  rosterInfo      String      @default("")
+  rosterFile      String?
+  logoFile        String?
+  logoCreation    String?
+  referralSource  String
+  status          QuoteStatus @default(PENDING)
+  aiPrompt        String?
+  mockupImages    String[]    @default([])
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}

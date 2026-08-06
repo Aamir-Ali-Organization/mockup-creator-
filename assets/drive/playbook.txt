@@ -1,0 +1,339 @@
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 1
+ BIG MAD DRIP
+ AI UNIFORM & LOGO
+PROMPT PLAYBOOK
+ A reusable prompt system for creating bold custom uniforms, team logos, product proofs,
+ athlete mockups, matching gear, and revisions across every major sport.
+ Built around the Big Mad Drip design workflow:
+Bold. Custom. High-definition. Production-minded. Never basic.
+ Use the fill-in fields throughout this guide to turn a team name, logo, color palette, and
+ sport into a complete visual collection.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 2
+1. The Big Mad Drip Prompt Formula
+For consistent results, build prompts in layers. The strongest prompts describe the product first, then the team identity, design
+language, placement, athlete or presentation style, and finally the output quality.
+1
+SPORT / PRODUCT
+Football uniform, flag compression set, basketball jersey, bag, glove, logo, etc.
+2
+TEAM IDENTITY
+Team name, mascot, city, number, supplied logo.
+3
+COLOR HIERARCHY
+Primary color, secondary color, accent color; say which must dominate.
+4
+DESIGN LANGUAGE
+Aggressive, clean, futuristic, claw marks, honeycomb, lightning, smoke, geometric, etc.
+5
+GARMENT DETAILS
+Sleeves, hood, neckline, compression/loose fit, shorts/pants, number placement.
+6
+MODEL / POSE
+Male/female/youth athlete, appearance, holding/kicking/throwing/serving a ball.
+7
+PRESENTATION
+White studio background, front/back proof, isolated product, transparent PNG.
+8
+QUALITY LOCK
+High-definition, crisp edges, realistic fabric, professional sportswear mockup.
+Core rule: when revising an existing design, explicitly say what must change and what must stay unchanged. This helps preserve
+the logo, face, pattern, layout, and proportions.
+Universal Master Uniform Prompt
+Create a premium custom [SPORT] uniform for [TEAM NAME]. Use [PRIMARY COLOR] as the dominant main color,
+[SECONDARY COLOR] as the secondary color, and [ACCENT COLOR] for sharp accents. Incorporate the supplied [TEAM
+LOGO / MASCOT] prominently on the uniform. Add [PATTERN / GRAPHIC LANGUAGE] throughout the design in a bold but
+professional way. The uniform should include [GARMENT DETAILS: sleeve length, neckline, hood/no hood,
+compression/loose fit, shorts/pants]. Place player number [NUMBER] on [PLACEMENT]. Add [CITY / TEAM WORDMARK]
+where appropriate. Make the design look like premium modern custom sportswear made for competition - aggressive,
+clean, athletic, and visually distinctive. Use realistic performance fabric, sublimated graphics, crisp seams,
+accurate proportions, and high-definition detail. Present it on [MODEL DESCRIPTION / MANNEQUIN / FLAT PRODUCT] in
+[POSE]. Use a clean white studio background. Keep the full uniform visible from head to toe when using an
+athlete. No extra logos, no random text, no watermarks.
+2. Logo Creation System
+Create the logo before the uniform when a team does not already have a strong identity. Ask for a clean primary mark first,
+then build secondary marks and wordmarks.
+Aggressive Mascot Logo
+Create a bold high-definition sports logo for a team named [TEAM NAME]. The mascot is a [MASCOT]. Use [PRIMARY],
+[SECONDARY], and [ACCENT] as the only major colors. Make the mascot look powerful, competitive, intimidating, and
+athletic without becoming overly complicated. Use sharp professional vector-style linework, strong outlines,
+clean negative space, balanced symmetry, and a modern elite sports branding aesthetic. Integrate the words "[TEAM
+NAME]" in a custom athletic wordmark that feels like part of the logo. The logo must reproduce clearly on
+jerseys, hats, bags, gloves, social graphics, and embroidery. Center the logo on a transparent background. No
+mockup, no shirt, no scenery, no watermark. High-definition isolated logo only.
+Clean Modern Team Logo
+Design a clean modern sports identity for [TEAM NAME] using [COLORS]. Build the mark around [MASCOT / LETTER /
+SYMBOL]. Make it bold enough for a football helmet or jersey chest but simple enough to remain readable at small
+sizes. Use strong geometry, professional typography, crisp vector-like edges, and a premium national-level sports
+brand feel. Transparent background. Isolated logo only.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 3
+Logo Variation Prompt
+Using the same team identity, colors, mascot, and overall visual language, create a secondary logo for [TEAM
+NAME]. Do not simply duplicate the primary logo. Make this version suitable for sleeves, shorts, hats, gloves,
+and small merchandise placements. Keep it clean, recognizable, and consistent with the original brand.
+3. Sport-by-Sport Uniform Prompts
+Flag Football / 7v7
+Create a premium custom 7v7 flag football compression uniform for [TEAM NAME]. Use [PRIMARY] as the main color
+with [SECONDARY] and [ACCENT] details. Incorporate the supplied team logo and [PATTERN] across the compression
+top and matching compression shorts. Make the top [SLEEVE TYPE] with [CREW/V-NECK/HOOD]. Add number [NUMBER] to
+the chest/back and left leg of the shorts. Add matching popper flags at the waist. Show a [MALE/FEMALE/YOUTH]
+athlete with an athletic build holding a football in a confident game-ready pose. Match the gloves, cleats, and
+optional headgear to the uniform. White studio background, full body, realistic performance fabric, crisp
+sublimation, high-definition.
+Tackle Football
+Create a full tackle football uniform for [TEAM NAME] using [COLORS]. Include a fitted game jersey over shoulder
+pads, football pants, matching socks, gloves, cleats, and helmet. Incorporate [LOGO] and [PATTERN] without
+overcrowding the design. Number [NUMBER] must be highly readable on the front, back, and shoulders. Show a
+powerful [MODEL] athlete [POSE: holding / throwing / pointing / flexing with] a football. Make every accessory
+coordinate with the uniform. White studio background, professional sports campaign quality, full-body
+high-definition.
+Basketball
+Create a premium sleeveless basketball uniform for [TEAM NAME]. Use [PRIMARY] as the dominant color with
+[SECONDARY] and [ACCENT] trim. Place the team wordmark across the chest and number [NUMBER] below it. Carry
+[PATTERN] subtly through the jersey side panels and matching basketball shorts. Add the team logo on the shorts.
+Show a [MODEL] basketball athlete [POSE] with a basketball. Modern athletic cut, realistic mesh/performance
+fabric, crisp sublimation, white studio background, high-definition.
+Baseball
+Create a premium custom baseball uniform for [TEAM NAME] using [COLORS]. Design a button-front baseball jersey
+with [SHORT/LONG] sleeves, matching baseball pants, belt, socks, cleats, and cap. Place [TEAM WORDMARK] across
+the chest and number [NUMBER] on the back. Use [PATTERN] as a controlled sublimated accent. Put the team logo on
+the cap. Show a [MODEL] baseball player [POSE] holding a bat or baseball. Clean white studio background,
+realistic fabric and stitching, high-definition.
+Softball
+Create a premium custom softball uniform for [TEAM NAME] using [COLORS]. Use a modern athletic [JERSEY STYLE]
+with matching softball pants/shorts and coordinated socks, belt, cleats, and optional visor. Integrate [LOGO],
+number [NUMBER], and [PATTERN]. Show a [FEMALE MODEL DESCRIPTION] athlete [POSE] with a softball, glove, or bat.
+Make the design bold, fast, and competitive while remaining clean and wearable. White studio background,
+realistic performance fabric, high-definition.
+Soccer
+Create a premium short-sleeve soccer kit for [TEAM NAME] using [COLORS]. Include a fitted soccer jersey, matching
+shorts, knee-high socks, and coordinated cleats. Place the team crest on the left chest, number [NUMBER] on the
+jersey and shorts, and integrate [PATTERN] through the body and sleeves. Show a [MODEL] soccer athlete [POSE:
+holding / dribbling / kicking] a soccer ball. Keep all footwear and socks matched to the kit. White studio
+background, realistic fabric, high-definition.
+Volleyball
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 4
+Create a premium sleeveless volleyball uniform for [TEAM NAME] using [COLORS]. Include a fitted performance
+jersey and matching volleyball shorts. Integrate the supplied team logo, number [NUMBER], and [PATTERN]. Show a
+[FEMALE/MALE MODEL] volleyball athlete [POSE: holding / serving / preparing to spike] a volleyball. Modern
+competition fit, realistic stretch performance fabric, crisp sublimation, white studio background, full-body
+high-definition.
+Lacrosse
+Create a premium custom lacrosse uniform for [TEAM NAME] using [COLORS]. Include a sleeveless/short-sleeve
+lacrosse jersey, matching shorts, gloves, cleats, and appropriate protective gear. Integrate [LOGO], number
+[NUMBER], and [PATTERN]. Show a [MODEL] lacrosse athlete holding a lacrosse stick in an aggressive game-ready
+pose. Keep the uniform readable and coordinated. White studio background, realistic fabric and equipment,
+high-definition.
+Track & Field
+Create a premium track and field uniform for [TEAM NAME] using [COLORS]. Include a fitted performance
+singlet/crop top and matching running shorts/compression bottoms. Integrate [LOGO], team wordmark, and [PATTERN]
+in a sleek aerodynamic layout. Show a [MALE/FEMALE] track athlete in a powerful sprint-start or running pose.
+Match footwear to the team palette. White studio background, elite competition look, high-definition.
+Cheer
+Create a premium competition cheer uniform for [TEAM NAME] using [COLORS]. Use [LOGO] and [PATTERN] to create a
+bold, clean, coordinated design with strong team branding. Include [TOP STYLE], [SKIRT/SHORTS], and matching
+accessories where appropriate. Show a [MODEL] cheer athlete in a confident competition pose. Keep the design
+athletic and performance-focused. White studio background, realistic fabric, crisp details, high-definition.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 5
+4. Home, Away & Alternate Colorways
+Once the first design is approved, preserve the design language and change only the color hierarchy.
+White Away Version
+Redo this exact uniform as the away version. Keep the same logo, pattern, number placement, garment cut, model,
+proportions, and overall design. Make WHITE the dominant main color. Use [TEAM PRIMARY] and [TEAM SECONDARY] only
+as accents. Do not redesign the uniform. Do not change the athlete's face or pose unless requested. Keep every
+other detail the same. High-definition, clean white studio background.
+Alternate Color Version
+Create an alternate colorway of this exact approved uniform. Change the dominant color from [CURRENT] to [NEW
+MAIN COLOR]. Preserve the logo, pattern, typography, number placement, garment construction, and overall layout
+exactly. Rebalance [SECONDARY/ACCENT COLORS] so the uniform remains readable and premium. Do not introduce new
+graphics.
+Back View
+Show the back of this exact uniform. Keep the design, colors, fabric, athlete, and proportions consistent with
+the approved front view. Add player name "[PLAYER]" across the upper back and number [NUMBER] centered below it.
+Continue the approved pattern naturally onto the back and sleeves. Do not redesign anything else. White studio
+background, high-definition.
+5. Product Proof & Production Prompts
+Uniform-Only Proof
+Remove the athlete and show only the complete [SPORT] uniform as a clean product proof. Display the front and
+back clearly on a white background. Preserve the exact approved colors, logo, pattern, number placement,
+neckline, sleeves, shorts/pants, and proportions. No body, no mannequin face, no props, no scenery.
+High-definition e-commerce/product-development presentation.
+Pattern Extraction
+Isolate and recreate only the graphic pattern used on this uniform. Remove the athlete, garment seams, logos,
+numbers, names, and background. Show the pattern flat, clean, seamless-looking, and high-definition so it can be
+referenced for sublimation artwork. Preserve the exact shapes, visual rhythm, and color relationships of the
+approved design.
+Transparent Logo Output
+Show only the approved logo. Remove the uniform, athlete, mockup, shadows, and background. Preserve the logo
+exactly. Clean the edges, improve clarity, and output it as a high-definition isolated graphic on a transparent
+background. Do not redesign the logo.
+6. Matching Gear Prompts
+Duffle / Backpack
+Create a premium custom [DUFFLE BAG / BACKPACK] for [TEAM NAME] using the exact approved uniform colors, logo,
+and pattern. Make [PRIMARY] dominant. Place the team logo prominently and carry the uniform graphic language
+across the bag panels without making it cluttered. Realistic product mockup, white background, high-definition.
+Football Gloves
+Create matching football gloves for [TEAM NAME] using the exact approved uniform colors and graphic pattern.
+Place the team logo so it becomes visible and recognizable across the gloves. Athletic performance construction,
+realistic grip texture, clean product view, white background, high-definition.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 6
+Sleeves / Headgear
+Create matching [ARM SLEEVES / SOFT-SHELL HEADGEAR] using the approved team logo, colors, and pattern. The gear
+must look like part of the same uniform collection. Keep branding readable and proportions realistic. White
+product background, high-definition.
+Hat / Visor
+Create a premium [SNAPBACK / BASEBALL CAP / VISOR / BUCKET HAT] for [TEAM NAME]. Use the approved logo and team
+colors. Keep the design bold but clean enough for embroidery. Show a realistic product mockup on a white
+background, high-definition.
+Warmup / Jogger Set
+Convert the approved uniform design language into a matching performance warmup/jogger suit for [TEAM NAME].
+Include a [JACKET/HOODIE] and matching joggers. Continue the approved colors and pattern naturally across the
+garments. Use the team logo on the chest and leg. White studio background, high-definition.
+Coach Apparel
+Create a matching coach [POLO / DRI-FIT SHIRT / LONG-SLEEVE TOP / HOODIE] for [TEAM NAME]. Use the team colors
+and approved pattern in a more professional, restrained layout than the player uniform. Place the team logo on
+the chest and add 'COACH' where requested. Pair with black or matching coach shorts/pants. High-definition white
+studio presentation.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 7
+7. Athlete & Action-Shot Prompt Add-Ons
+Attach one of these lines to a uniform prompt after the design description.
+ Show a Black female athlete with an athletic build, confident expression, and realistic proportions.
+ Show a dark-haired Hispanic/Latina female athlete with an athletic build and a strong competitive pose.
+ Show a white male athlete with blond hair and an athletic build.
+ Show a youth athlete with age-appropriate proportions and a confident game-ready stance.
+ Have the athlete hold the football and point directly toward the camera.
+ Show the athlete throwing the football with realistic throwing mechanics.
+ Show the soccer player actively kicking the ball.
+ Show the volleyball player serving the ball with an athletic overhead motion.
+ Show the athlete flexing while holding the ball, with the full uniform still visible.
+ Keep the athlete's face exactly the same as the reference image; change only the requested uniform details.
+8. Revision Prompt Library
+The fastest way to revise an approved design is to use short, surgical instructions.
+Change main color
+Keep everything exactly the same. Change only the main uniform color to [COLOR]. Preserve the logo, graphics,
+pattern, number, athlete, pose, fit, and all other details.
+Swap logo
+Replace only the current logo with the supplied [NEW LOGO]. Match its placement and scale to the existing design.
+Do not change the colors, pattern, athlete, uniform cut, or any other element.
+Remove number
+Remove number [NUMBER] from [LOCATION]. Keep every other part of the image exactly the same.
+Continue sleeves
+Continue the existing uniform pattern naturally across both sleeves so the sleeves feel fully integrated with the
+body design. Do not change anything else.
+Match accessories
+Make the cleats, socks, gloves, and accessories coordinate with the approved uniform colors and pattern. Keep the
+uniform itself unchanged.
+Remove hood
+Remove the hood and convert the top to a clean [CREW NECK / V-NECK]. Keep the exact same pattern, colors, logo,
+fit, and athlete.
+Add hood
+Add a performance hood to this exact design and continue the approved pattern onto the hood. Keep everything else
+unchanged.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 8
+Sleeveless
+Convert this exact top to a sleeveless athletic cut. Preserve all colors, graphics, logo placements, numbers, and
+proportions.
+Improve clarity
+Increase the visual clarity and apparent resolution of this exact design. Sharpen edges, fabric detail, logos,
+numbers, and graphics without redesigning or changing the content.
+Name correction
+Change only the displayed name from '[OLD NAME]' to '[NEW NAME]'. Preserve the font style, position, size, color,
+character, face, uniform, and every other detail.
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 9
+9. Big Mad Drip Full Collection Master Prompt
+Build a complete premium sportswear collection for [TEAM NAME] in the sport of [SPORT]. Use [PRIMARY] as the
+dominant color, [SECONDARY] as the secondary color, and [ACCENT] as the accent. Use the supplied [LOGO] as the
+official team identity. The visual theme is [THEME / PATTERN]. Create a cohesive collection consisting of: 1.
+Primary home uniform. 2. White-based away uniform. 3. Alternate uniform in [ALT COLOR]. 4. Front and back product
+proof. 5. Matching team duffle bag or backpack. 6. Matching gloves / sleeves / headgear where appropriate. 7.
+Matching hat or visor. 8. Matching warmup/jogger set. 9. Matching coach apparel. All products must clearly belong
+to the same collection. Preserve consistent logos, colors, typography, pattern language, and premium athletic
+styling. Avoid generic stock-uniform aesthetics. Make the collection bold, custom, competitive, and visually
+recognizable as a complete team brand. Use realistic materials, accurate garment construction, crisp sublimated
+graphics, clean logo reproduction, and high-definition professional product presentation. Use clean white studio
+backgrounds unless an action-shot version is specifically requested.
+10. Quick Fill-In Design Brief
+TEAM NAME
+____________________________
+SPORT
+____________________________
+MASCOT / LOGO
+____________________________
+PRIMARY COLOR
+____________________________
+SECONDARY COLOR
+____________________________
+ACCENT COLOR
+____________________________
+MAIN THEME / PATTERN
+____________________________
+HOME MAIN COLOR
+____________________________
+AWAY MAIN COLOR
+____________________________
+ALTERNATE MAIN COLOR
+____________________________
+SLEEVE / NECK / HOOD
+____________________________
+FIT
+Compression / Fitted / Loose / Other
+PLAYER NUMBER
+____________________________
+PLAYER NAME
+____________________________
+MODEL
+Male / Female / Youth / Product only
+POSE
+____________________________
+MATCHING GEAR
+____________________________
+Final quality lock to add when needed: "Do not add random text, extra logos, unexplained graphics, watermarks, or unnecessary
+accessories. Keep all spelling exact. Preserve the supplied logo faithfully. Make the final image clean, realistic, high-definition, and
+suitable for a professional custom sportswear presentation."
+
+
+===== PAGE BREAK =====
+
+BIG MAD DRIP - AI DESIGN PROMPT PLAYBOOK
+Page 10
+ BIG MAD DRIP - LOOK READY BEFORE THE GAME STARTS.
