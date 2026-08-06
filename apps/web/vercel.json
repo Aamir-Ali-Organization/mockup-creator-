@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install",
+  "installCommand": "cd ../.. && PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --filter @mockup/web...",
   "buildCommand": "cd ../.. && pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build",
   "functions": {
     "src/app/api/mockups/generate/route.ts": {

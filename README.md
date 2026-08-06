@@ -86,11 +86,12 @@ Deploy the **Next.js** app — not the legacy Fastify backend.
 |--------|--------|
 | **Root Directory** | `apps/web` |
 | **Framework** | Next.js |
-| **Install Command** | `cd ../.. && pnpm install` |
+| **Install Command** | `cd ../.. && PRISMA_SKIP_POSTINSTALL_GENERATE=1 pnpm install --filter @mockup/web...` |
 | **Build Command** | `cd ../.. && pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build` |
 | **Output** | leave default (Next.js) |
 
-> If Root Directory is `apps/backend`, the build fails looking for `@mockup/shared` — change it to `apps/web`.
+> If Root Directory is `apps/backend`, the build fails / pulls Prisma + Fastify — change it to `apps/web`.
+> Use `--filter @mockup/web...` so legacy backend packages are **not** installed on Vercel.
 
 Also enable **“Include source files outside of the Root Directory in the Build Step”** so the monorepo `packages/shared` is available.
 
