@@ -1,5 +1,7 @@
 {
   "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build",
   "functions": {
     "src/app/api/mockups/generate/route.ts": {
       "maxDuration": 60

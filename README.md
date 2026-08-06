@@ -78,10 +78,27 @@ Behavior:
 
 ## Vercel deploy
 
-1. Root directory: `apps/web` (or monorepo with filter)
-2. Build: `pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build`
-3. Add the env vars above in the Vercel project
-4. Use a plan that allows **60s** function duration for image generation
+Deploy the **Next.js** app — not the legacy Fastify backend.
+
+### Project settings (important)
+
+| Setting | Value |
+|--------|--------|
+| **Root Directory** | `apps/web` |
+| **Framework** | Next.js |
+| **Install Command** | `cd ../.. && pnpm install` |
+| **Build Command** | `cd ../.. && pnpm --filter @mockup/shared build && pnpm --filter @mockup/web build` |
+| **Output** | leave default (Next.js) |
+
+> If Root Directory is `apps/backend`, the build fails looking for `@mockup/shared` — change it to `apps/web`.
+
+Also enable **“Include source files outside of the Root Directory in the Build Step”** so the monorepo `packages/shared` is available.
+
+### Environment variables
+
+Add the same vars as `.env.local` in the Vercel project (Production + Preview).
+
+Use a plan that allows **60s** function duration for `/api/mockups/generate`.
 
 ## Scripts
 

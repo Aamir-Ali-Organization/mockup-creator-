@@ -40,7 +40,7 @@ export const mockupRoutes: FastifyPluginAsync = async (app) => {
         status: result.quote.status,
         promptPayload: result.payload,
         aiPrompt: result.prompt,
-        mockupImages: result.quote.mockupImages.map((file) => `/uploads/${file}`),
+        mockupImages: result.quote.mockupImages.map((file: string) => `/uploads/${file}`),
       };
     } catch (error) {
       if (error instanceof AppError) throw error;
