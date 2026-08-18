@@ -1,4 +1,5 @@
-import OpenAI from 'openai';
+import { readFile } from 'node:fs/promises';
+import OpenAI, { toFile } from 'openai';
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 
@@ -6,29 +7,17 @@ export function canGenerateMockups() {
   return Boolean(env.OPENAI_API_KEY);
 }
 
-export async function generateMockupImage(prompt: string): Promise<{
-  dataUrl: string;
-  model: string;
-}> {
-  if (!env.OPENAI_API_KEY) {
-    throw new AppError('OPENAI_API_KEY is not configured', 503);
-  }
+type SampleFile = {
+  path: string;
+  filename: string;
+  mimeType: string;
+};
 
-  const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-
-  try {
-    const result = await openai.images.generate({
-      model: env.OPENAI_IMAGE_MODEL,
-      prompt,
-      n: 1,
-      size: env.OPENAI_IMAGE_SIZE as '1024x1024',
-    });
-
-    const image = result.data?.[0];
-    if (!image) {
-      throw new AppError('OpenAI returned no image data', 502);
-    }
-
+function extractImageDataUrl(image: {
+  b64_json?: string;
+  url?: string;
+}): Promise<{ dataUrl: string; model: string }> {
+  return (async () => {
     if (image.b64_json) {
       return {
         dataUrl: `data:image/png;base64,${image.b64_json}`,
@@ -49,6 +38,64 @@ export async function generateMockupImage(prompt: string): Promise<{
     }
 
     throw new AppError('OpenAI image response missing url and b64_json', 502);
+  })();
+}
+
+export async function generateMockupImage(
+  prompt: string,
+  sampleFiles: SampleFile[] = [],
+): Promise<{
+  dataUrl: string;
+  model: string;
+  usedSamples: number;
+}> {
+  if (!env.OPENAI_API_KEY) {
+    throw new AppError('OPENAI_API_KEY is not configured', 503);
+  }
+
+  const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+
+  try {
+    if (sampleFiles.length > 0) {
+      const images = await Promise.all(
+        sampleFiles.slice(0, 8).map(async (sample) => {
+          const buffer = await readFile(sample.path);
+          return toFile(buffer, sample.filename, { type: sample.mimeType });
+        }),
+      );
+
+      const result = await openai.images.edit({
+        model: env.OPENAI_IMAGE_MODEL,
+        image: images,
+        prompt,
+        n: 1,
+        size: env.OPENAI_IMAGE_SIZE as '1024x1024',
+        input_fidelity: 'high',
+      });
+
+      const image = result.data?.[0];
+      if (!image) {
+        throw new AppError('OpenAI returned no image data', 502);
+      }
+
+      const parsed = await extractImageDataUrl(image);
+      return { ...parsed, usedSamples: images.length };
+    }
+
+    const result = await openai.images.generate({
+      model: env.OPENAI_IMAGE_MODEL,
+      prompt,
+      n: 1,
+      size: env.OPENAI_IMAGE_SIZE as '1024x1024',
+    });
+
+    const image = result.data?.[0];
+    if (!image) {
+      throw new AppError('OpenAI returned no image data', 502);
+    }
+
+    const parsed = await extractImageDataUrl(image);
+    return { ...parsed, usedSamples: 0 };
   } catch (error) {
     if (error instanceof AppError) throw error;
 

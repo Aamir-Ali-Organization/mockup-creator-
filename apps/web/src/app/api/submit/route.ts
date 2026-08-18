@@ -3,7 +3,7 @@ import { env } from '@/lib/env';
 import { toErrorResponse, AppError } from '@/lib/errors';
 import { isGhlReady, resolveLeadByFleadid, upsertLeadInGhl } from '@/lib/ghl';
 import { canGenerateMockups } from '@/lib/openai';
-import { buildPromptFromQuote } from '@/lib/prompt-builder';
+import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       skipMockup = existing.mockupAlreadyGenerated;
     }
 
-    const { prompt, payload } = buildPromptFromQuote({
+    const { prompt, payload, profile } = await buildPromptFromQuoteWithKnowledge({
       teamName: data.teamName,
       sport: data.sport,
       gender: data.gender,
@@ -101,6 +101,7 @@ export async function POST(request: Request) {
       shouldGenerate:
         !skipMockup && env.AUTO_GENERATE_MOCKUP && canGenerateMockups(),
       promptPreview: prompt,
+      knowledgeProfileId: profile.id,
       payload,
       job: {
         customerName: data.customerName,

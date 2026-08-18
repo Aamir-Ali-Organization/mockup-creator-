@@ -47,6 +47,13 @@ GHL_MOCKUP_GENERATED_FIELD=mockup_generated
 GHL_MOCKUP_IMAGE_FIELD=mockup_image
 ```
 
+Knowledge admin (`/admin/knowledge`) login:
+
+```bash
+KNOWLEDGE_ADMIN_USER=admin@admin.com
+KNOWLEDGE_ADMIN_PASSWORD=Admin@123
+```
+
 ## Vercel deploy (one-time setup)
 
 See **[DEPLOY.md](./DEPLOY.md)** for the full checklist.

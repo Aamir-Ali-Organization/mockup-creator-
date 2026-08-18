@@ -8,6 +8,11 @@ coverage
 !.env.example
 uploads/*
 !uploads/.gitkeep
+apps/web/public/knowledge/samples/**
+!apps/web/public/knowledge/samples/.gitkeep
+apps/web/data/knowledge/profiles/**
+!apps/web/data/knowledge/profiles/.gitkeep
+.pnpm-store/
 *.log
 .DS_Store
 .turbo

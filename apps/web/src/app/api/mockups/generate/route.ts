@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
+import { resolveSampleAbsolutePaths } from '@/lib/knowledge-store';
 import { canGenerateMockups, generateMockupImage } from '@/lib/openai';
-import { buildPromptFromQuote } from '@/lib/prompt-builder';
+import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { prompt, payload } = buildPromptFromQuote({
+    const { prompt, payload, profile } = await buildPromptFromQuoteWithKnowledge({
       teamName: job.teamName,
       sport: job.sport,
       gender: job.gender,
@@ -76,7 +77,8 @@ export async function POST(request: Request) {
       rosterInfo: job.rosterInfo,
     });
 
-    const image = await generateMockupImage(prompt);
+    const sampleFiles = await resolveSampleAbsolutePaths(profile);
+    const image = await generateMockupImage(prompt, sampleFiles);
 
     // Never fail the mockup response if GHL update breaks — quote + image already succeeded.
     let ghlWarning: string | null = null;
@@ -100,6 +102,8 @@ export async function POST(request: Request) {
       model: image.model,
       prompt,
       payload,
+      knowledgeProfileId: profile.id,
+      usedSamples: image.usedSamples,
       imageDataUrl: image.dataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
       ghlWarning,

@@ -15,6 +15,11 @@ const envSchema = z.object({
   GHL_FACEBOOK_LEAD_FIELD: z.string().default('facebook_lead_id'),
   GHL_MOCKUP_GENERATED_FIELD: z.string().default('mockup_generated'),
   GHL_MOCKUP_IMAGE_FIELD: z.string().default('mockup_image'),
+  /** Knowledge admin login (required for /admin/knowledge). */
+  KNOWLEDGE_ADMIN_USER: z.string().default('admin@admin.com'),
+  KNOWLEDGE_ADMIN_PASSWORD: z.string().default('Admin@123'),
+  /** Optional legacy bearer secret for API clients. */
+  KNOWLEDGE_ADMIN_SECRET: z.string().optional().default(''),
 });
 
 export const env = envSchema.parse({
@@ -28,4 +33,7 @@ export const env = envSchema.parse({
   GHL_FACEBOOK_LEAD_FIELD: process.env.GHL_FACEBOOK_LEAD_FIELD,
   GHL_MOCKUP_GENERATED_FIELD: process.env.GHL_MOCKUP_GENERATED_FIELD,
   GHL_MOCKUP_IMAGE_FIELD: process.env.GHL_MOCKUP_IMAGE_FIELD,
+  KNOWLEDGE_ADMIN_USER: process.env.KNOWLEDGE_ADMIN_USER,
+  KNOWLEDGE_ADMIN_PASSWORD: process.env.KNOWLEDGE_ADMIN_PASSWORD,
+  KNOWLEDGE_ADMIN_SECRET: process.env.KNOWLEDGE_ADMIN_SECRET,
 });
