@@ -13,67 +13,138 @@ import {
 } from '@mockup/shared';
 import { AppError } from '@/lib/errors';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'knowledge', 'profiles');
-const SAMPLES_DIR = path.join(process.cwd(), 'public', 'knowledge', 'samples');
+/** Bundled with the app (readable on Vercel). */
+const BUNDLE_DIR = path.join(process.cwd(), 'data', 'knowledge', 'profiles');
+/** Writable overlay — local project dir, or /tmp on serverless. */
+const WRITE_DIR =
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? path.join('/tmp', 'mockup-knowledge', 'profiles')
+    : BUNDLE_DIR;
+const SAMPLES_WRITE_DIR =
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? path.join('/tmp', 'mockup-knowledge', 'samples')
+    : path.join(process.cwd(), 'public', 'knowledge', 'samples');
+const SAMPLES_PUBLIC_DIR = path.join(process.cwd(), 'public', 'knowledge', 'samples');
 
-async function ensureDirs() {
-  await mkdir(DATA_DIR, { recursive: true });
-  await mkdir(SAMPLES_DIR, { recursive: true });
+/** In-memory overlay so the same serverless instance sees saves. */
+const memoryProfiles = new Map<string, KnowledgeProfile>();
+
+function profileWritePath(slug: string) {
+  return path.join(WRITE_DIR, `${slug}.json`);
 }
 
-function profilePath(slug: string) {
-  return path.join(DATA_DIR, `${slug}.json`);
+function profileBundlePath(slug: string) {
+  return path.join(BUNDLE_DIR, `${slug}.json`);
 }
 
 function sampleDir(slug: string) {
-  return path.join(SAMPLES_DIR, slug);
+  return path.join(SAMPLES_WRITE_DIR, slug);
 }
 
-export async function ensureKnowledgeDefaults() {
-  await ensureDirs();
-  const existing = await readdir(DATA_DIR).catch(() => [] as string[]);
-  if (existing.some((name) => name.endsWith('.json'))) return;
-
-  const defaults = createDefaultKnowledgeProfiles();
-  await Promise.all(
-    defaults.map((profile) =>
-      writeFile(profilePath(profile.id), JSON.stringify(profile, null, 2), 'utf8'),
-    ),
-  );
+async function ensureWriteDirs() {
+  await mkdir(WRITE_DIR, { recursive: true }).catch(() => undefined);
+  await mkdir(SAMPLES_WRITE_DIR, { recursive: true }).catch(() => undefined);
 }
 
-async function readProfileFile(slug: string): Promise<KnowledgeProfile | null> {
+async function readJsonProfile(filePath: string): Promise<KnowledgeProfile | null> {
   try {
-    const raw = await readFile(profilePath(slug), 'utf8');
+    const raw = await readFile(filePath, 'utf8');
     return knowledgeProfileSchema.parse(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
+async function readProfileFile(slug: string): Promise<KnowledgeProfile | null> {
+  const mem = memoryProfiles.get(slug);
+  if (mem) return mem;
+
+  const fromWrite = await readJsonProfile(profileWritePath(slug));
+  if (fromWrite) return fromWrite;
+
+  const fromBundle = await readJsonProfile(profileBundlePath(slug));
+  if (fromBundle) return fromBundle;
+
+  return null;
+}
+
+async function writeProfileFile(profile: KnowledgeProfile) {
+  memoryProfiles.set(profile.id, profile);
+  await ensureWriteDirs();
+  try {
+    await writeFile(profileWritePath(profile.id), JSON.stringify(profile, null, 2), 'utf8');
+  } catch (error) {
+    // Memory still holds the profile for this instance.
+    console.warn('[knowledge] disk write failed, using memory only:', error);
+  }
+}
+
+export async function ensureKnowledgeDefaults() {
+  await ensureWriteDirs();
+
+  // Prefer seeding writable dir; if that fails, bundled/memory defaults still work.
+  try {
+    const existing = await readdir(WRITE_DIR).catch(() => [] as string[]);
+    if (existing.some((name) => name.endsWith('.json'))) return;
+
+    const bundled = await readdir(BUNDLE_DIR).catch(() => [] as string[]);
+    if (bundled.some((name) => name.endsWith('.json'))) return;
+
+    const defaults = createDefaultKnowledgeProfiles();
+    await Promise.all(defaults.map((profile) => writeProfileFile(profile)));
+  } catch (error) {
+    console.warn('[knowledge] could not seed defaults on disk:', error);
+  }
+}
+
 export async function listKnowledgeProfiles(): Promise<KnowledgeProfile[]> {
   await ensureKnowledgeDefaults();
 
-  const files = await readdir(DATA_DIR);
-  const profiles: KnowledgeProfile[] = [];
+  const byId = new Map<string, KnowledgeProfile>();
 
-  for (const file of files) {
-    if (!file.endsWith('.json')) continue;
-    const profile = await readProfileFile(file.replace(/\.json$/, ''));
-    if (profile) profiles.push(profile);
+  // Defaults first.
+  for (const profile of createDefaultKnowledgeProfiles()) {
+    byId.set(profile.id, profile);
   }
 
-  // Ensure every known sport exists (new sports added later get seeded).
+  // Bundled committed files.
+  try {
+    const files = await readdir(BUNDLE_DIR);
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const profile = await readJsonProfile(path.join(BUNDLE_DIR, file));
+      if (profile) byId.set(profile.id, profile);
+    }
+  } catch {
+    // ignore missing bundle dir
+  }
+
+  // Writable overlay.
+  try {
+    const files = await readdir(WRITE_DIR);
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      const profile = await readJsonProfile(path.join(WRITE_DIR, file));
+      if (profile) byId.set(profile.id, profile);
+    }
+  } catch {
+    // ignore
+  }
+
+  // Memory wins.
+  for (const [id, profile] of memoryProfiles) {
+    byId.set(id, profile);
+  }
+
+  // Guarantee every sport exists.
   for (const sport of SPORTS) {
     const slug = sportToSlug(sport);
-    if (!profiles.some((p) => p.id === slug)) {
-      const created = createDefaultKnowledgeProfile(sport);
-      await writeFile(profilePath(slug), JSON.stringify(created, null, 2), 'utf8');
-      profiles.push(created);
+    if (!byId.has(slug)) {
+      byId.set(slug, createDefaultKnowledgeProfile(sport));
     }
   }
 
-  return profiles.sort((a, b) => a.label.localeCompare(b.label));
+  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export async function getKnowledgeProfile(sportOrSlug: string): Promise<KnowledgeProfile> {
@@ -82,14 +153,13 @@ export async function getKnowledgeProfile(sportOrSlug: string): Promise<Knowledg
   const existing = await readProfileFile(slug);
   if (existing) return existing;
 
-  // Fallback: try exact sport label match from defaults, else Other, else master default.
   const byLabel =
     SPORTS.find((s) => sportToSlug(s) === slug) ??
     SPORTS.find((s) => s.toLowerCase() === sportOrSlug.toLowerCase());
 
   if (byLabel) {
     const created = createDefaultKnowledgeProfile(byLabel);
-    await writeFile(profilePath(created.id), JSON.stringify(created, null, 2), 'utf8');
+    await writeProfileFile(created);
     return created;
   }
 
@@ -125,7 +195,7 @@ export async function saveKnowledgeProfile(
     updatedAt: new Date().toISOString(),
   });
 
-  await writeFile(profilePath(next.id), JSON.stringify(next, null, 2), 'utf8');
+  await writeProfileFile(next);
   return next;
 }
 
@@ -153,12 +223,24 @@ export async function addKnowledgeSample(input: {
   const filename = `${id}${ext}`;
   const dir = sampleDir(profile.id);
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, filename), input.buffer);
+
+  try {
+    await writeFile(path.join(dir, filename), input.buffer);
+  } catch {
+    throw new AppError(
+      'Could not store sample image on this host. Use a VPS or object storage for persistent uploads.',
+      503,
+    );
+  }
 
   const sample: KnowledgeSample = {
     id,
     filename,
-    url: `/knowledge/samples/${profile.id}/${filename}`,
+    // Served via API on serverless; public path locally when under public/
+    url:
+      process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+        ? `/api/knowledge/${profile.id}/samples/file/${filename}`
+        : `/knowledge/samples/${profile.id}/${filename}`,
     caption: input.caption?.trim() || '',
     uploadedAt: new Date().toISOString(),
   };
@@ -176,8 +258,8 @@ export async function removeKnowledgeSample(
   const sample = profile.sampleImages.find((s) => s.id === sampleId);
   if (!sample) throw new AppError('Sample not found', 404);
 
-  const filePath = path.join(sampleDir(profile.id), sample.filename);
-  await unlink(filePath).catch(() => undefined);
+  await unlink(path.join(sampleDir(profile.id), sample.filename)).catch(() => undefined);
+  await unlink(path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename)).catch(() => undefined);
 
   return saveKnowledgeProfile(profile.id, {
     sampleImages: profile.sampleImages.filter((s) => s.id !== sampleId),
@@ -190,12 +272,23 @@ export async function resolveSampleAbsolutePaths(profile: KnowledgeProfile): Pro
   const results: Array<{ path: string; filename: string; mimeType: string }> = [];
 
   for (const sample of profile.sampleImages) {
-    const absolute = path.join(SAMPLES_DIR, profile.id, sample.filename);
-    try {
-      await access(absolute);
-    } catch {
-      continue;
+    const candidates = [
+      path.join(SAMPLES_WRITE_DIR, profile.id, sample.filename),
+      path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename),
+    ];
+
+    let absolute: string | null = null;
+    for (const candidate of candidates) {
+      try {
+        await access(candidate);
+        absolute = candidate;
+        break;
+      } catch {
+        // try next
+      }
     }
+    if (!absolute) continue;
+
     const ext = path.extname(sample.filename).toLowerCase();
     const mimeType =
       ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
@@ -203,4 +296,12 @@ export async function resolveSampleAbsolutePaths(profile: KnowledgeProfile): Pro
   }
 
   return results;
+}
+
+export function getSampleFilePath(sportSlug: string, filename: string) {
+  const safeName = path.basename(filename);
+  return {
+    writePath: path.join(SAMPLES_WRITE_DIR, sportSlug, safeName),
+    publicPath: path.join(SAMPLES_PUBLIC_DIR, sportSlug, safeName),
+  };
 }

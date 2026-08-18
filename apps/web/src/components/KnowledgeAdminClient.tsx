@@ -160,7 +160,19 @@ export function KnowledgeAdminClient() {
       const data = await readJson<{ profiles: ProfileSummary[] }>(res);
       return data.profiles;
     },
+    retry: 1,
   });
+
+  useEffect(() => {
+    if (listQuery.error) {
+      showToast(
+        listQuery.error instanceof Error
+          ? listQuery.error.message
+          : 'Failed to load sports',
+        'err',
+      );
+    }
+  }, [listQuery.error]);
 
   const filteredSports = useMemo(() => {
     const q = sportQuery.trim().toLowerCase();
@@ -472,7 +484,12 @@ export function KnowledgeAdminClient() {
               {listQuery.isLoading && (
                 <p className="px-2 py-4 text-sm text-white/40">Loading sports…</p>
               )}
-              {!listQuery.isLoading && filteredSports.length === 0 && (
+              {listQuery.isError && (
+                <p className="px-2 py-4 text-sm text-red-300">
+                  Failed to load sports. Check API / env, then retry.
+                </p>
+              )}
+              {!listQuery.isLoading && !listQuery.isError && filteredSports.length === 0 && (
                 <p className="px-2 py-4 text-sm text-white/40">No sports match.</p>
               )}
               {filteredSports.map((profile) => {
@@ -531,9 +548,44 @@ export function KnowledgeAdminClient() {
 
         {/* Editor */}
         <main className="min-w-0 p-4 sm:p-6 lg:p-8">
-          {!draft || detailQuery.isLoading ? (
+          {listQuery.isError ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
+              <p className="text-red-200">Couldn’t load knowledge profiles.</p>
+              <p className="max-w-md text-sm text-white/45">
+                {listQuery.error instanceof Error
+                  ? listQuery.error.message
+                  : 'Check Vercel logs and env vars, then refresh.'}
+              </p>
+              <button
+                type="button"
+                className="btn-ghost mt-2 text-sm"
+                onClick={() => void listQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : !selectedSport ? (
+            <div className="flex h-64 items-center justify-center text-white/45">
+              {listQuery.isLoading ? 'Loading sports…' : 'Select a sport to edit.'}
+            </div>
+          ) : detailQuery.isLoading && !draft ? (
             <div className="flex h-64 items-center justify-center text-white/45">
               Loading profile…
+            </div>
+          ) : detailQuery.isError ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
+              <p className="text-red-200">Couldn’t load this sport profile.</p>
+              <button
+                type="button"
+                className="btn-ghost mt-2 text-sm"
+                onClick={() => void detailQuery.refetch()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : !draft ? (
+            <div className="flex h-64 items-center justify-center text-white/45">
+              Select a sport to edit.
             </div>
           ) : (
             <div className="space-y-6 animate-[fadeUp_0.35s_ease-out]">
