@@ -52,6 +52,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
     void generateMockup({
       contactId: merged.contactId,
       fleadid: merged.fleadid,
+      submissionId: merged.submissionId,
       job: merged.job,
     })
       .then((result) => {
@@ -80,6 +81,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
     void generateMockup({
       contactId: ghlContactId || session.contactId,
       fleadid: fleadidFromUrl || session.fleadid,
+      submissionId: session.submissionId,
       job: session.job,
       force: true,
     })

@@ -41,6 +41,7 @@ export type SubmitResult = {
   success: boolean;
   contactId: string | null;
   fleadid: string | null;
+  submissionId?: string | null;
   skipMockup: boolean;
   shouldGenerate: boolean;
   job: MockupJob;
@@ -52,6 +53,7 @@ export type GenerateResult = {
   message?: string;
   contactId?: string | null;
   fleadid?: string | null;
+  submissionId?: string | null;
   imageDataUrl?: string;
   model?: string;
 };
@@ -61,6 +63,7 @@ export const MOCKUP_SESSION_KEY = 'bmd-mockup-session';
 export type MockupSession = {
   contactId: string | null;
   fleadid: string | null;
+  submissionId?: string | null;
   skipMockup: boolean;
   shouldGenerate: boolean;
   job: MockupJob;
@@ -135,6 +138,7 @@ export async function submitQuote(values: CreateQuotePayload): Promise<SubmitRes
 export async function generateMockup(payload: {
   contactId: string | null;
   fleadid: string | null;
+  submissionId?: string | null;
   job: MockupJob;
   force?: boolean;
 }): Promise<GenerateResult> {

@@ -4,6 +4,7 @@ import { toErrorResponse, AppError } from '@/lib/errors';
 import { isGhlReady, resolveLeadByFleadid, upsertLeadInGhl } from '@/lib/ghl';
 import { canGenerateMockups } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
+import { createSubmission } from '@/lib/submission-store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -93,33 +94,52 @@ export async function POST(request: Request) {
       contactId = ghlResult.contactId;
     }
 
+    const job = {
+      customerName: data.customerName,
+      email: data.email,
+      phone: data.phone,
+      teamName: data.teamName,
+      sport: data.sport,
+      gender: data.gender,
+      ageGroup: data.ageGroup,
+      primaryColor: data.primaryColor,
+      secondaryColor: data.secondaryColor,
+      alternateColor: data.alternateColor,
+      quantity: data.quantity,
+      accessories: data.accessories,
+      rosterInfo: data.rosterInfo,
+      logoCreation: data.logoCreation || null,
+      referralSource: data.referralSource,
+    };
+
+    let submissionId: string | null = null;
+    try {
+      const submission = await createSubmission({
+        job,
+        prompt,
+        payload,
+        contactId,
+        fleadid,
+        knowledgeProfileId: profile.id,
+        skipMockup,
+      });
+      submissionId = submission.id;
+    } catch (logError) {
+      console.error('[submit] failed to log submission:', logError);
+    }
+
     return Response.json({
       success: true,
       contactId,
       fleadid,
+      submissionId,
       skipMockup,
       shouldGenerate:
         !skipMockup && env.AUTO_GENERATE_MOCKUP && canGenerateMockups(),
       promptPreview: prompt,
       knowledgeProfileId: profile.id,
       payload,
-      job: {
-        customerName: data.customerName,
-        email: data.email,
-        phone: data.phone,
-        teamName: data.teamName,
-        sport: data.sport,
-        gender: data.gender,
-        ageGroup: data.ageGroup,
-        primaryColor: data.primaryColor,
-        secondaryColor: data.secondaryColor,
-        alternateColor: data.alternateColor,
-        quantity: data.quantity,
-        accessories: data.accessories,
-        rosterInfo: data.rosterInfo,
-        logoCreation: data.logoCreation || null,
-        referralSource: data.referralSource,
-      },
+      job,
     });
   } catch (error) {
     return toErrorResponse(error);

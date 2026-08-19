@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KnowledgeProfile } from '@mockup/shared';
 import { KNOWLEDGE_PLACEHOLDERS } from '@mockup/shared';
@@ -416,6 +417,9 @@ export function KnowledgeAdminClient() {
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link href="/admin/submissions" className="btn-ghost !px-3 !py-2 text-xs">
+              Submissions
+            </Link>
             {isDirty && (
               <span className="hidden rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent sm:inline">
                 Unsaved changes

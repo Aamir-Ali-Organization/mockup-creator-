@@ -107,6 +107,7 @@ export function QuoteForm() {
       saveMockupSession({
         contactId: data.contactId,
         fleadid: data.fleadid,
+        submissionId: data.submissionId ?? null,
         skipMockup: data.skipMockup,
         shouldGenerate: data.shouldGenerate,
         job: data.job,

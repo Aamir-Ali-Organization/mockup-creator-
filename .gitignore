@@ -12,6 +12,8 @@ apps/web/public/knowledge/samples/**
 !apps/web/public/knowledge/samples/.gitkeep
 apps/web/data/knowledge/profiles/**
 !apps/web/data/knowledge/profiles/.gitkeep
+apps/web/data/submissions/**
+!apps/web/data/submissions/.gitkeep
 .pnpm-store/
 *.log
 .DS_Store
