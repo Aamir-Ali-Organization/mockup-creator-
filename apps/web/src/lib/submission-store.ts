@@ -1,7 +1,9 @@
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { list, put } from '@vercel/blob';
 import { z } from 'zod';
+import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 
 const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -39,6 +41,8 @@ export const submissionRecordSchema = z.object({
   usedSamples: z.number().optional().default(0),
   hasImage: z.boolean().default(false),
   imageFile: z.string().nullable().optional(),
+  /** Public URL when stored in Vercel Blob. */
+  imageUrl: z.string().nullable().optional(),
   errorMessage: z.string().nullable().optional(),
   skipMockup: z.boolean().optional().default(false),
 });
@@ -63,19 +67,46 @@ export type SubmissionSummary = {
 
 const memory = new Map<string, SubmissionRecord>();
 
-/** All places we may have written / may need to read (cwd can differ by process). */
+export function hasBlobStorage() {
+  return Boolean(env.BLOB_READ_WRITE_TOKEN);
+}
+
+export function getSubmissionsStorageInfo() {
+  if (hasBlobStorage()) {
+    return {
+      mode: 'blob' as const,
+      persistent: true,
+      message: 'Submissions are stored in Vercel Blob (persistent).',
+    };
+  }
+  if (isServerless) {
+    return {
+      mode: 'ephemeral' as const,
+      persistent: false,
+      message:
+        'Vercel serverless storage is ephemeral. Add BLOB_READ_WRITE_TOKEN so submissions persist across requests.',
+    };
+  }
+  return {
+    mode: 'local' as const,
+    persistent: true,
+    message: 'Submissions are stored in local JSON files.',
+  };
+}
+
 function candidateRoots(): string[] {
   if (isServerless) {
     return [path.join('/tmp', 'mockup-submissions')];
   }
-
   const cwd = process.cwd();
-  const roots = [
-    path.join(cwd, 'data', 'submissions'),
-    path.join(cwd, 'apps', 'web', 'data', 'submissions'),
+  return [
+    ...new Set(
+      [
+        path.join(cwd, 'data', 'submissions'),
+        path.join(cwd, 'apps', 'web', 'data', 'submissions'),
+      ].map((r) => path.resolve(r)),
+    ),
   ];
-
-  return [...new Set(roots.map((r) => path.resolve(r)))];
 }
 
 let writeRoot: string | null = null;
@@ -84,8 +115,8 @@ async function resolveWriteRoot(): Promise<string> {
   if (writeRoot) return writeRoot;
   if (isServerless) {
     writeRoot = path.join('/tmp', 'mockup-submissions');
-    await mkdir(path.join(writeRoot, 'meta'), { recursive: true });
-    await mkdir(path.join(writeRoot, 'images'), { recursive: true });
+    await mkdir(path.join(writeRoot, 'meta'), { recursive: true }).catch(() => undefined);
+    await mkdir(path.join(writeRoot, 'images'), { recursive: true }).catch(() => undefined);
     return writeRoot;
   }
 
@@ -109,10 +140,6 @@ async function resolveWriteRoot(): Promise<string> {
   return writeRoot;
 }
 
-async function ensureDirs() {
-  await resolveWriteRoot();
-}
-
 function metaPathFor(root: string, id: string) {
   return path.join(root, 'meta', `${id}.json`);
 }
@@ -121,14 +148,80 @@ function imagePathFor(root: string, filename: string) {
   return path.join(root, 'images', filename);
 }
 
-async function persistRecord(record: SubmissionRecord) {
-  memory.set(record.id, record);
+function blobMetaPath(id: string) {
+  return `submissions/${id}/meta.json`;
+}
+
+function blobImagePath(id: string, ext: string) {
+  return `submissions/${id}/mockup${ext}`;
+}
+
+async function putBlobMeta(record: SubmissionRecord) {
+  await put(blobMetaPath(record.id), JSON.stringify(record, null, 2), {
+    access: 'public',
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: 'application/json',
+    token: env.BLOB_READ_WRITE_TOKEN,
+  });
+}
+
+async function putBlobImage(id: string, buffer: Buffer, ext: string, contentType: string) {
+  const result = await put(blobImagePath(id, ext), buffer, {
+    access: 'public',
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType,
+    token: env.BLOB_READ_WRITE_TOKEN,
+  });
+  return result.url;
+}
+
+async function fetchBlobMeta(url: string): Promise<SubmissionRecord | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const parsed = submissionRecordSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function listFromBlob(): Promise<SubmissionRecord[]> {
+  const { blobs } = await list({
+    prefix: 'submissions/',
+    token: env.BLOB_READ_WRITE_TOKEN,
+  });
+
+  const metaBlobs = blobs.filter((b) => b.pathname.endsWith('/meta.json'));
+  const records = await Promise.all(metaBlobs.map((b) => fetchBlobMeta(b.url)));
+  return records.filter((r): r is SubmissionRecord => Boolean(r));
+}
+
+async function persistLocal(record: SubmissionRecord) {
   const root = await resolveWriteRoot();
   try {
     await writeFile(metaPathFor(root, record.id), JSON.stringify(record, null, 2), 'utf8');
   } catch (error) {
-    console.warn('[submissions] meta write failed, memory only:', error);
+    console.warn('[submissions] local meta write failed:', error);
   }
+}
+
+async function persistRecord(record: SubmissionRecord) {
+  memory.set(record.id, record);
+
+  if (hasBlobStorage()) {
+    try {
+      await putBlobMeta(record);
+      return;
+    } catch (error) {
+      console.error('[submissions] blob meta write failed:', error);
+      // fall through to local/memory so the request still succeeds
+    }
+  }
+
+  await persistLocal(record);
 }
 
 async function readJsonRecord(filePath: string): Promise<SubmissionRecord | null> {
@@ -149,6 +242,25 @@ async function readRecord(id: string): Promise<SubmissionRecord | null> {
   const mem = memory.get(id);
   if (mem) return mem;
 
+  if (hasBlobStorage()) {
+    try {
+      const { blobs } = await list({
+        prefix: `submissions/${id}/`,
+        token: env.BLOB_READ_WRITE_TOKEN,
+      });
+      const meta = blobs.find((b) => b.pathname.endsWith('meta.json'));
+      if (meta) {
+        const record = await fetchBlobMeta(meta.url);
+        if (record) {
+          memory.set(id, record);
+          return record;
+        }
+      }
+    } catch (error) {
+      console.warn('[submissions] blob read failed:', error);
+    }
+  }
+
   for (const root of candidateRoots()) {
     const record = await readJsonRecord(metaPathFor(root, id));
     if (record) {
@@ -159,14 +271,18 @@ async function readRecord(id: string): Promise<SubmissionRecord | null> {
   return null;
 }
 
-function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; ext: string } {
+function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; ext: string; contentType: string } {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl);
   if (!match) {
     throw new AppError('Invalid image data URL', 400);
   }
-  const mime = match[1];
-  const ext = mime.includes('jpeg') || mime.includes('jpg') ? '.jpg' : mime.includes('webp') ? '.webp' : '.png';
-  return { buffer: Buffer.from(match[2], 'base64'), ext };
+  const contentType = match[1];
+  const ext = contentType.includes('jpeg') || contentType.includes('jpg')
+    ? '.jpg'
+    : contentType.includes('webp')
+      ? '.webp'
+      : '.png';
+  return { buffer: Buffer.from(match[2], 'base64'), ext, contentType };
 }
 
 export async function createSubmission(input: {
@@ -194,6 +310,7 @@ export async function createSubmission(input: {
     usedSamples: 0,
     hasImage: false,
     imageFile: null,
+    imageUrl: null,
     errorMessage: null,
     skipMockup: Boolean(input.skipMockup),
   };
@@ -216,6 +333,7 @@ export async function updateSubmission(
       | 'knowledgeProfileId'
       | 'errorMessage'
       | 'skipMockup'
+      | 'imageUrl'
     >
   > & { imageDataUrl?: string | null },
 ): Promise<SubmissionRecord> {
@@ -224,17 +342,31 @@ export async function updateSubmission(
 
   let hasImage = current.hasImage;
   let imageFile = current.imageFile;
-  const root = await resolveWriteRoot();
+  let imageUrl = current.imageUrl ?? null;
 
   if (patch.imageDataUrl) {
-    const { buffer, ext } = dataUrlToBuffer(patch.imageDataUrl);
+    const { buffer, ext, contentType } = dataUrlToBuffer(patch.imageDataUrl);
     const filename = `${id}${ext}`;
-    try {
-      await writeFile(imagePathFor(root, filename), buffer);
-      hasImage = true;
-      imageFile = filename;
-    } catch (error) {
-      console.warn('[submissions] image write failed:', error);
+
+    if (hasBlobStorage()) {
+      try {
+        imageUrl = await putBlobImage(id, buffer, ext, contentType);
+        hasImage = true;
+        imageFile = filename;
+      } catch (error) {
+        console.error('[submissions] blob image write failed:', error);
+      }
+    }
+
+    if (!hasImage || !hasBlobStorage()) {
+      try {
+        const root = await resolveWriteRoot();
+        await writeFile(imagePathFor(root, filename), buffer);
+        hasImage = true;
+        imageFile = filename;
+      } catch (error) {
+        console.warn('[submissions] local image write failed:', error);
+      }
     }
   }
 
@@ -244,6 +376,7 @@ export async function updateSubmission(
     ...rest,
     hasImage,
     imageFile,
+    imageUrl: patch.imageUrl !== undefined ? patch.imageUrl : imageUrl,
     updatedAt: new Date().toISOString(),
   });
 
@@ -258,11 +391,22 @@ export async function getSubmission(id: string): Promise<SubmissionRecord> {
 }
 
 export async function listSubmissions(limit = 100): Promise<SubmissionSummary[]> {
-  await ensureDirs();
   const byId = new Map<string, SubmissionRecord>();
 
   for (const [id, record] of memory) {
     byId.set(id, record);
+  }
+
+  if (hasBlobStorage()) {
+    try {
+      const records = await listFromBlob();
+      for (const record of records) {
+        byId.set(record.id, record);
+        memory.set(record.id, record);
+      }
+    } catch (error) {
+      console.error('[submissions] blob list failed:', error);
+    }
   }
 
   for (const root of candidateRoots()) {
@@ -304,9 +448,15 @@ export async function listSubmissions(limit = 100): Promise<SubmissionSummary[]>
 
 export async function readSubmissionImage(
   id: string,
-): Promise<{ buffer: Buffer; contentType: string } | null> {
+): Promise<{ buffer: Buffer; contentType: string; redirectUrl?: string } | null> {
   const record = await readRecord(id);
-  if (!record?.imageFile) return null;
+  if (!record) return null;
+
+  if (record.imageUrl) {
+    return { buffer: Buffer.alloc(0), contentType: 'image/png', redirectUrl: record.imageUrl };
+  }
+
+  if (!record.imageFile) return null;
 
   for (const root of candidateRoots()) {
     try {
@@ -320,7 +470,7 @@ export async function readSubmissionImage(
             : 'image/png';
       return { buffer, contentType };
     } catch {
-      // try next root
+      // try next
     }
   }
   return null;

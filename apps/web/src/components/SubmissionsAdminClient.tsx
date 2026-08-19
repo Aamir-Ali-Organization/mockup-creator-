@@ -100,22 +100,27 @@ export function SubmissionsAdminClient() {
         credentials: 'include',
         cache: 'no-store',
       });
-      const data = await readJson<{ submissions: SubmissionSummary[] }>(res);
-      return data.submissions;
+      const data = await readJson<{
+        submissions: SubmissionSummary[];
+        storage?: { mode: string; persistent: boolean; message: string };
+      }>(res);
+      return data;
     },
   });
 
+  const storage = listQuery.data?.storage;
+  const submissionList = listQuery.data?.submissions ?? [];
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = listQuery.data ?? [];
-    if (!q) return list;
-    return list.filter((s) =>
+    if (!q) return submissionList;
+    return submissionList.filter((s) =>
       [s.customerName, s.email, s.teamName, s.sport, s.id, s.contactId || '', s.fleadid || '']
         .join(' ')
         .toLowerCase()
         .includes(q),
     );
-  }, [listQuery.data, query]);
+  }, [submissionList, query]);
 
   useEffect(() => {
     if (!selectedId && filtered[0]) setSelectedId(filtered[0].id);
@@ -231,9 +236,14 @@ export function SubmissionsAdminClient() {
               onChange={(e) => setQuery(e.target.value)}
             />
             <p className="px-1 text-[11px] text-white/35">
-              {listQuery.data?.length ?? 0} submission
-              {(listQuery.data?.length ?? 0) === 1 ? '' : 's'}
+              {submissionList.length} submission
+              {submissionList.length === 1 ? '' : 's'}
             </p>
+            {storage && !storage.persistent && (
+              <div className="rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent">
+                {storage.message}
+              </div>
+            )}
             <div className="max-h-[calc(100vh-200px)] space-y-1 overflow-y-auto pr-1">
               {listQuery.isLoading && (
                 <p className="px-2 py-4 text-sm text-white/40">Loading…</p>

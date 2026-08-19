@@ -20,6 +20,8 @@ const envSchema = z.object({
   KNOWLEDGE_ADMIN_PASSWORD: z.string().default('Admin@123'),
   /** Optional legacy bearer secret for API clients. */
   KNOWLEDGE_ADMIN_SECRET: z.string().optional().default(''),
+  /** Vercel Blob token — required for persistent submissions on Vercel. */
+  BLOB_READ_WRITE_TOKEN: z.string().optional().default(''),
 });
 
 export const env = envSchema.parse({
@@ -36,4 +38,5 @@ export const env = envSchema.parse({
   KNOWLEDGE_ADMIN_USER: process.env.KNOWLEDGE_ADMIN_USER,
   KNOWLEDGE_ADMIN_PASSWORD: process.env.KNOWLEDGE_ADMIN_PASSWORD,
   KNOWLEDGE_ADMIN_SECRET: process.env.KNOWLEDGE_ADMIN_SECRET,
+  BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
 });

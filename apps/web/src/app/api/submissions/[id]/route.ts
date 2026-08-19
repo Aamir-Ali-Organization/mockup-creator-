@@ -11,10 +11,13 @@ export async function GET(request: Request, { params }: Params) {
     assertKnowledgeAdmin(request);
     const { id } = await params;
     const submission = await getSubmission(decodeURIComponent(id));
+    const imageUrl =
+      submission.imageUrl ||
+      (submission.hasImage ? `/api/submissions/${submission.id}/image` : null);
     return Response.json({
       success: true,
       submission,
-      imageUrl: submission.hasImage ? `/api/submissions/${submission.id}/image` : null,
+      imageUrl,
     });
   } catch (error) {
     return toErrorResponse(error);

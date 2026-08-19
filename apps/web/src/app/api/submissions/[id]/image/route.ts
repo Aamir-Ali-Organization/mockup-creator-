@@ -12,6 +12,11 @@ export async function GET(request: Request, { params }: Params) {
     const { id } = await params;
     const image = await readSubmissionImage(decodeURIComponent(id));
     if (!image) throw new AppError('Image not found', 404);
+
+    if (image.redirectUrl) {
+      return Response.redirect(image.redirectUrl, 302);
+    }
+
     return new Response(new Uint8Array(image.buffer), {
       headers: {
         'Content-Type': image.contentType,
