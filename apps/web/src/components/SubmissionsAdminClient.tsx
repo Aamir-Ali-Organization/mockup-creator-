@@ -92,9 +92,14 @@ export function SubmissionsAdminClient() {
   const listQuery = useQuery({
     queryKey: ['submissions'],
     enabled: Boolean(user),
-    refetchInterval: 15_000,
+    refetchInterval: 8_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     queryFn: async () => {
-      const res = await fetch('/api/submissions?limit=150', { credentials: 'include' });
+      const res = await fetch(`/api/submissions?limit=150&t=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       const data = await readJson<{ submissions: SubmissionSummary[] }>(res);
       return data.submissions;
     },
@@ -194,6 +199,14 @@ export function SubmissionsAdminClient() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn-ghost !px-3 !py-2 text-xs"
+              onClick={() => void listQuery.refetch()}
+              disabled={listQuery.isFetching}
+            >
+              {listQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+            </button>
             <Link href="/admin/knowledge" className="btn-ghost !px-3 !py-2 text-xs">
               Knowledge
             </Link>
@@ -217,6 +230,10 @@ export function SubmissionsAdminClient() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <p className="px-1 text-[11px] text-white/35">
+              {listQuery.data?.length ?? 0} submission
+              {(listQuery.data?.length ?? 0) === 1 ? '' : 's'}
+            </p>
             <div className="max-h-[calc(100vh-200px)] space-y-1 overflow-y-auto pr-1">
               {listQuery.isLoading && (
                 <p className="px-2 py-4 text-sm text-white/40">Loading…</p>

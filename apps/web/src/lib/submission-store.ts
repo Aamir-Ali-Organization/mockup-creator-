@@ -1,17 +1,10 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '@/lib/errors';
 
 const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-
-const ROOT_DIR = isServerless
-  ? path.join('/tmp', 'mockup-submissions')
-  : path.join(process.cwd(), 'data', 'submissions');
-
-const META_DIR = path.join(ROOT_DIR, 'meta');
-const IMAGE_DIR = path.join(ROOT_DIR, 'images');
 
 export const submissionJobSchema = z.object({
   customerName: z.string(),
@@ -70,40 +63,100 @@ export type SubmissionSummary = {
 
 const memory = new Map<string, SubmissionRecord>();
 
+/** All places we may have written / may need to read (cwd can differ by process). */
+function candidateRoots(): string[] {
+  if (isServerless) {
+    return [path.join('/tmp', 'mockup-submissions')];
+  }
+
+  const cwd = process.cwd();
+  const roots = [
+    path.join(cwd, 'data', 'submissions'),
+    path.join(cwd, 'apps', 'web', 'data', 'submissions'),
+  ];
+
+  return [...new Set(roots.map((r) => path.resolve(r)))];
+}
+
+let writeRoot: string | null = null;
+
+async function resolveWriteRoot(): Promise<string> {
+  if (writeRoot) return writeRoot;
+  if (isServerless) {
+    writeRoot = path.join('/tmp', 'mockup-submissions');
+    await mkdir(path.join(writeRoot, 'meta'), { recursive: true });
+    await mkdir(path.join(writeRoot, 'images'), { recursive: true });
+    return writeRoot;
+  }
+
+  for (const root of candidateRoots()) {
+    try {
+      await mkdir(path.join(root, 'meta'), { recursive: true });
+      await mkdir(path.join(root, 'images'), { recursive: true });
+      const probe = path.join(root, 'meta', '.write-test');
+      await writeFile(probe, 'ok', 'utf8');
+      await access(probe);
+      writeRoot = root;
+      return root;
+    } catch {
+      // try next
+    }
+  }
+
+  writeRoot = candidateRoots()[0];
+  await mkdir(path.join(writeRoot, 'meta'), { recursive: true }).catch(() => undefined);
+  await mkdir(path.join(writeRoot, 'images'), { recursive: true }).catch(() => undefined);
+  return writeRoot;
+}
+
 async function ensureDirs() {
-  await mkdir(META_DIR, { recursive: true }).catch(() => undefined);
-  await mkdir(IMAGE_DIR, { recursive: true }).catch(() => undefined);
+  await resolveWriteRoot();
 }
 
-function metaPath(id: string) {
-  return path.join(META_DIR, `${id}.json`);
+function metaPathFor(root: string, id: string) {
+  return path.join(root, 'meta', `${id}.json`);
 }
 
-function imagePath(filename: string) {
-  return path.join(IMAGE_DIR, filename);
+function imagePathFor(root: string, filename: string) {
+  return path.join(root, 'images', filename);
 }
 
 async function persistRecord(record: SubmissionRecord) {
   memory.set(record.id, record);
-  await ensureDirs();
+  const root = await resolveWriteRoot();
   try {
-    await writeFile(metaPath(record.id), JSON.stringify(record, null, 2), 'utf8');
+    await writeFile(metaPathFor(root, record.id), JSON.stringify(record, null, 2), 'utf8');
   } catch (error) {
     console.warn('[submissions] meta write failed, memory only:', error);
+  }
+}
+
+async function readJsonRecord(filePath: string): Promise<SubmissionRecord | null> {
+  try {
+    const raw = await readFile(filePath, 'utf8');
+    const parsed = submissionRecordSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
+      console.warn('[submissions] invalid record', filePath, parsed.error.message);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
   }
 }
 
 async function readRecord(id: string): Promise<SubmissionRecord | null> {
   const mem = memory.get(id);
   if (mem) return mem;
-  try {
-    const raw = await readFile(metaPath(id), 'utf8');
-    const parsed = submissionRecordSchema.parse(JSON.parse(raw));
-    memory.set(id, parsed);
-    return parsed;
-  } catch {
-    return null;
+
+  for (const root of candidateRoots()) {
+    const record = await readJsonRecord(metaPathFor(root, id));
+    if (record) {
+      memory.set(id, record);
+      return record;
+    }
   }
+  return null;
 }
 
 function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; ext: string } {
@@ -171,18 +224,17 @@ export async function updateSubmission(
 
   let hasImage = current.hasImage;
   let imageFile = current.imageFile;
+  const root = await resolveWriteRoot();
 
   if (patch.imageDataUrl) {
-    await ensureDirs();
     const { buffer, ext } = dataUrlToBuffer(patch.imageDataUrl);
     const filename = `${id}${ext}`;
     try {
-      await writeFile(imagePath(filename), buffer);
+      await writeFile(imagePathFor(root, filename), buffer);
       hasImage = true;
       imageFile = filename;
     } catch (error) {
       console.warn('[submissions] image write failed:', error);
-      // Keep going — still update meta without image file if needed
     }
   }
 
@@ -213,17 +265,22 @@ export async function listSubmissions(limit = 100): Promise<SubmissionSummary[]>
     byId.set(id, record);
   }
 
-  try {
-    const files = await readdir(META_DIR);
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      const id = file.replace(/\.json$/, '');
-      if (byId.has(id)) continue;
-      const record = await readRecord(id);
-      if (record) byId.set(id, record);
+  for (const root of candidateRoots()) {
+    try {
+      const files = await readdir(path.join(root, 'meta'));
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        const id = file.replace(/\.json$/, '');
+        if (byId.has(id)) continue;
+        const record = await readJsonRecord(metaPathFor(root, id));
+        if (record) {
+          memory.set(id, record);
+          byId.set(id, record);
+        }
+      }
+    } catch {
+      // missing dir ok
     }
-  } catch {
-    // empty dir is fine
   }
 
   return [...byId.values()]
@@ -250,17 +307,21 @@ export async function readSubmissionImage(
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const record = await readRecord(id);
   if (!record?.imageFile) return null;
-  try {
-    const buffer = await readFile(imagePath(record.imageFile));
-    const ext = path.extname(record.imageFile).toLowerCase();
-    const contentType =
-      ext === '.jpg' || ext === '.jpeg'
-        ? 'image/jpeg'
-        : ext === '.webp'
-          ? 'image/webp'
-          : 'image/png';
-    return { buffer, contentType };
-  } catch {
-    return null;
+
+  for (const root of candidateRoots()) {
+    try {
+      const buffer = await readFile(imagePathFor(root, record.imageFile));
+      const ext = path.extname(record.imageFile).toLowerCase();
+      const contentType =
+        ext === '.jpg' || ext === '.jpeg'
+          ? 'image/jpeg'
+          : ext === '.webp'
+            ? 'image/webp'
+            : 'image/png';
+      return { buffer, contentType };
+    } catch {
+      // try next root
+    }
   }
+  return null;
 }
