@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { list, put } from '@vercel/blob';
+import { get, list, put, type PutBlobResult } from '@vercel/blob';
 import { z } from 'zod';
 import { env } from '@/lib/env';
 import { AppError } from '@/lib/errors';
@@ -41,7 +41,9 @@ export const submissionRecordSchema = z.object({
   usedSamples: z.number().optional().default(0),
   hasImage: z.boolean().default(false),
   imageFile: z.string().nullable().optional(),
-  /** Public URL when stored in Vercel Blob. */
+  /** Blob pathname (preferred) or legacy local filename. */
+  imagePathname: z.string().nullable().optional(),
+  /** Public URL when store is public; otherwise null and image is served via API. */
   imageUrl: z.string().nullable().optional(),
   errorMessage: z.string().nullable().optional(),
   skipMockup: z.boolean().optional().default(false),
@@ -66,30 +68,44 @@ export type SubmissionSummary = {
 };
 
 const memory = new Map<string, SubmissionRecord>();
+let blobAccess: 'private' | 'public' | null = null;
+let lastBlobError: string | null = null;
+
+function blobToken() {
+  return (env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim();
+}
 
 export function hasBlobStorage() {
-  return Boolean(env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(blobToken());
 }
 
 export function getSubmissionsStorageInfo() {
   if (hasBlobStorage()) {
     return {
       mode: 'blob' as const,
-      persistent: true,
-      message: 'Submissions are stored in Vercel Blob (persistent).',
+      persistent: !lastBlobError,
+      access: blobAccess,
+      lastError: lastBlobError,
+      message: lastBlobError
+        ? `Blob token is set, but storage failed: ${lastBlobError}`
+        : `Submissions use Vercel Blob (${blobAccess || 'auto'}).`,
     };
   }
   if (isServerless) {
     return {
       mode: 'ephemeral' as const,
       persistent: false,
+      access: null,
+      lastError: null,
       message:
-        'Vercel serverless storage is ephemeral. Add BLOB_READ_WRITE_TOKEN so submissions persist across requests.',
+        'Vercel serverless disk is ephemeral. Add BLOB_READ_WRITE_TOKEN and redeploy.',
     };
   }
   return {
     mode: 'local' as const,
     persistent: true,
+    access: null,
+    lastError: null,
     message: 'Submissions are stored in local JSON files.',
   };
 }
@@ -156,47 +172,116 @@ function blobImagePath(id: string, ext: string) {
   return `submissions/${id}/mockup${ext}`;
 }
 
-async function putBlobMeta(record: SubmissionRecord) {
-  await put(blobMetaPath(record.id), JSON.stringify(record, null, 2), {
-    access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: 'application/json',
-    token: env.BLOB_READ_WRITE_TOKEN,
-  });
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
-async function putBlobImage(id: string, buffer: Buffer, ext: string, contentType: string) {
-  const result = await put(blobImagePath(id, ext), buffer, {
-    access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType,
-    token: env.BLOB_READ_WRITE_TOKEN,
-  });
-  return result.url;
-}
+async function putBlob(
+  pathname: string,
+  body: string | Buffer | Uint8Array,
+  contentType: string,
+): Promise<PutBlobResult> {
+  const token = blobToken();
+  const payload = typeof body === 'string' ? body : Buffer.from(body);
+  // New Blob stores are often private — try private first, then public.
+  const order: Array<'private' | 'public'> = blobAccess
+    ? [blobAccess]
+    : ['private', 'public'];
 
-async function fetchBlobMeta(url: string): Promise<SubmissionRecord | null> {
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const parsed = submissionRecordSchema.safeParse(await res.json());
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
+  let lastError: unknown;
+  for (const access of order) {
+    try {
+      const result = await put(pathname, payload, {
+        access,
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType,
+        token,
+      });
+      blobAccess = access;
+      lastBlobError = null;
+      return result;
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  lastBlobError = errorMessage(lastError);
+  throw lastError instanceof Error ? lastError : new Error(lastBlobError);
+}
+
+async function getBlobJson(pathname: string): Promise<SubmissionRecord | null> {
+  const token = blobToken();
+  const order: Array<'private' | 'public'> = blobAccess
+    ? [blobAccess]
+    : ['private', 'public'];
+
+  for (const access of order) {
+    try {
+      const result = await get(pathname, { access, token, useCache: false });
+      if (!result?.stream) continue;
+      const text = await new Response(result.stream).text();
+      const parsed = submissionRecordSchema.safeParse(JSON.parse(text));
+      if (parsed.success) {
+        blobAccess = access;
+        lastBlobError = null;
+        return parsed.data;
+      }
+    } catch {
+      // try next access mode
+    }
+  }
+  return null;
+}
+
+async function getBlobBytes(
+  pathname: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const token = blobToken();
+  const order: Array<'private' | 'public'> = blobAccess
+    ? [blobAccess]
+    : ['private', 'public'];
+
+  for (const access of order) {
+    try {
+      const result = await get(pathname, { access, token, useCache: false });
+      if (!result?.stream) continue;
+      const buffer = Buffer.from(await new Response(result.stream).arrayBuffer());
+      blobAccess = access;
+      return {
+        buffer,
+        contentType: result.blob.contentType || 'application/octet-stream',
+      };
+    } catch {
+      // try next
+    }
+  }
+  return null;
 }
 
 async function listFromBlob(): Promise<SubmissionRecord[]> {
-  const { blobs } = await list({
-    prefix: 'submissions/',
-    token: env.BLOB_READ_WRITE_TOKEN,
-  });
+  const token = blobToken();
+  const records: SubmissionRecord[] = [];
+  let cursor: string | undefined;
 
-  const metaBlobs = blobs.filter((b) => b.pathname.endsWith('/meta.json'));
-  const records = await Promise.all(metaBlobs.map((b) => fetchBlobMeta(b.url)));
-  return records.filter((r): r is SubmissionRecord => Boolean(r));
+  do {
+    const page = await list({
+      prefix: 'submissions/',
+      token,
+      cursor,
+      limit: 1000,
+    });
+
+    const metaBlobs = page.blobs.filter((b) => b.pathname.endsWith('/meta.json'));
+    const batch = await Promise.all(metaBlobs.map((b) => getBlobJson(b.pathname)));
+    for (const record of batch) {
+      if (record) records.push(record);
+    }
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  return records;
 }
 
 async function persistLocal(record: SubmissionRecord) {
@@ -213,11 +298,12 @@ async function persistRecord(record: SubmissionRecord) {
 
   if (hasBlobStorage()) {
     try {
-      await putBlobMeta(record);
+      await putBlob(blobMetaPath(record.id), JSON.stringify(record, null, 2), 'application/json');
       return;
     } catch (error) {
       console.error('[submissions] blob meta write failed:', error);
-      // fall through to local/memory so the request still succeeds
+      lastBlobError = errorMessage(error);
+      // On Vercel, local /tmp will not be visible to other functions — still try for this instance.
     }
   }
 
@@ -244,20 +330,14 @@ async function readRecord(id: string): Promise<SubmissionRecord | null> {
 
   if (hasBlobStorage()) {
     try {
-      const { blobs } = await list({
-        prefix: `submissions/${id}/`,
-        token: env.BLOB_READ_WRITE_TOKEN,
-      });
-      const meta = blobs.find((b) => b.pathname.endsWith('meta.json'));
-      if (meta) {
-        const record = await fetchBlobMeta(meta.url);
-        if (record) {
-          memory.set(id, record);
-          return record;
-        }
+      const record = await getBlobJson(blobMetaPath(id));
+      if (record) {
+        memory.set(id, record);
+        return record;
       }
     } catch (error) {
       console.warn('[submissions] blob read failed:', error);
+      lastBlobError = errorMessage(error);
     }
   }
 
@@ -310,6 +390,7 @@ export async function createSubmission(input: {
     usedSamples: 0,
     hasImage: false,
     imageFile: null,
+    imagePathname: null,
     imageUrl: null,
     errorMessage: null,
     skipMockup: Boolean(input.skipMockup),
@@ -334,6 +415,7 @@ export async function updateSubmission(
       | 'errorMessage'
       | 'skipMockup'
       | 'imageUrl'
+      | 'imagePathname'
     >
   > & { imageDataUrl?: string | null },
 ): Promise<SubmissionRecord> {
@@ -342,23 +424,28 @@ export async function updateSubmission(
 
   let hasImage = current.hasImage;
   let imageFile = current.imageFile;
+  let imagePathname = current.imagePathname ?? null;
   let imageUrl = current.imageUrl ?? null;
 
   if (patch.imageDataUrl) {
     const { buffer, ext, contentType } = dataUrlToBuffer(patch.imageDataUrl);
     const filename = `${id}${ext}`;
+    const pathname = blobImagePath(id, ext);
 
     if (hasBlobStorage()) {
       try {
-        imageUrl = await putBlobImage(id, buffer, ext, contentType);
+        const uploaded = await putBlob(pathname, buffer, contentType);
         hasImage = true;
         imageFile = filename;
+        imagePathname = pathname;
+        imageUrl = blobAccess === 'public' ? uploaded.url : null;
       } catch (error) {
         console.error('[submissions] blob image write failed:', error);
+        lastBlobError = errorMessage(error);
       }
     }
 
-    if (!hasImage || !hasBlobStorage()) {
+    if (!imagePathname) {
       try {
         const root = await resolveWriteRoot();
         await writeFile(imagePathFor(root, filename), buffer);
@@ -376,6 +463,7 @@ export async function updateSubmission(
     ...rest,
     hasImage,
     imageFile,
+    imagePathname,
     imageUrl: patch.imageUrl !== undefined ? patch.imageUrl : imageUrl,
     updatedAt: new Date().toISOString(),
   });
@@ -404,8 +492,10 @@ export async function listSubmissions(limit = 100): Promise<SubmissionSummary[]>
         byId.set(record.id, record);
         memory.set(record.id, record);
       }
+      if (!lastBlobError) lastBlobError = null;
     } catch (error) {
       console.error('[submissions] blob list failed:', error);
+      lastBlobError = errorMessage(error);
     }
   }
 
@@ -452,15 +542,25 @@ export async function readSubmissionImage(
   const record = await readRecord(id);
   if (!record) return null;
 
-  if (record.imageUrl) {
+  if (record.imageUrl && blobAccess === 'public') {
     return { buffer: Buffer.alloc(0), contentType: 'image/png', redirectUrl: record.imageUrl };
+  }
+
+  const pathname =
+    record.imagePathname ||
+    (record.imageFile?.includes('/') ? record.imageFile : null) ||
+    (record.imageFile ? blobImagePath(id, path.extname(record.imageFile) || '.png') : null);
+
+  if (pathname && hasBlobStorage()) {
+    const fromBlob = await getBlobBytes(pathname);
+    if (fromBlob) return fromBlob;
   }
 
   if (!record.imageFile) return null;
 
   for (const root of candidateRoots()) {
     try {
-      const buffer = await readFile(imagePathFor(root, record.imageFile));
+      const buffer = await readFile(imagePathFor(root, path.basename(record.imageFile)));
       const ext = path.extname(record.imageFile).toLowerCase();
       const contentType =
         ext === '.jpg' || ext === '.jpeg'

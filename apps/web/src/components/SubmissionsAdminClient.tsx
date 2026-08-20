@@ -102,7 +102,13 @@ export function SubmissionsAdminClient() {
       });
       const data = await readJson<{
         submissions: SubmissionSummary[];
-        storage?: { mode: string; persistent: boolean; message: string };
+        storage?: {
+          mode: string;
+          persistent: boolean;
+          message: string;
+          lastError?: string | null;
+          access?: string | null;
+        };
       }>(res);
       return data;
     },
@@ -239,9 +245,21 @@ export function SubmissionsAdminClient() {
               {submissionList.length} submission
               {submissionList.length === 1 ? '' : 's'}
             </p>
-            {storage && !storage.persistent && (
-              <div className="rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-[11px] leading-relaxed text-accent">
+            {storage && (
+              <div
+                className={`rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${
+                  storage.persistent
+                    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+                    : 'border-accent/30 bg-accent/10 text-accent'
+                }`}
+              >
                 {storage.message}
+                {!storage.persistent && (
+                  <span className="mt-1 block opacity-80">
+                    After fixing Blob, submit the form again — older Vercel entries were not
+                    persisted.
+                  </span>
+                )}
               </div>
             )}
             <div className="max-h-[calc(100vh-200px)] space-y-1 overflow-y-auto pr-1">
