@@ -203,7 +203,14 @@ export async function listKnowledgeProfiles(): Promise<KnowledgeProfile[]> {
     }
   }
 
-  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
+  const sportOrder = new Map(SPORTS.map((sport, index) => [sportToSlug(sport), index]));
+
+  return [...byId.values()].sort((a, b) => {
+    const aIndex = sportOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+    const bIndex = sportOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return a.label.localeCompare(b.label);
+  });
 }
 
 export async function getKnowledgeProfile(sportOrSlug: string): Promise<KnowledgeProfile> {
