@@ -14,6 +14,9 @@ export const SPORTS = [
   'Other',
 ] as const;
 
+/** Sports shown on the public quote form. Full `SPORTS` stays available in knowledge admin. */
+export const PUBLIC_SPORTS = ['Flag Football'] as const;
+
 export const GENDERS = ['Mens', 'Womens', 'Boys', 'Girls', 'Co-ed'] as const;
 
 export const AGE_GROUPS = ['Youth', 'Adult', 'Both'] as const;

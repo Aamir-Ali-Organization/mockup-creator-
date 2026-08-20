@@ -7,8 +7,8 @@ import {
   LOGO_CREATION_OPTIONS,
   MIN_UNIFORM_QUANTITY,
   QUOTE_STATUSES,
+  PUBLIC_SPORTS,
   REFERRAL_SOURCES,
-  SPORTS,
 } from './constants.js';
 
 function hasFileList(value: unknown): boolean {
@@ -70,7 +70,7 @@ export const quoteFormSchema = z.object({
     }
   }),
   teamName: requiredText('Team name is required', 2, 'Enter a team name'),
-  sport: requiredSelect(SPORTS, 'Select a sport'),
+  sport: requiredSelect(PUBLIC_SPORTS, 'Select a sport'),
   gender: requiredSelect(GENDERS, 'Select a gender'),
   ageGroup: requiredSelect(AGE_GROUPS, 'Select youth or adult'),
   primaryColor: requiredText('Primary color is required'),
@@ -111,7 +111,7 @@ export const createQuoteBodySchema = z.object({
   email: z.string().trim().email(),
   phone: z.string().trim().min(7),
   teamName: z.string().trim().min(2),
-  sport: z.enum(SPORTS),
+  sport: z.enum(PUBLIC_SPORTS),
   gender: z.enum(GENDERS),
   ageGroup: z.enum(AGE_GROUPS),
   primaryColor: z.string().trim().min(1),

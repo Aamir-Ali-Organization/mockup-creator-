@@ -8,8 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AGE_GROUPS,
   GENDERS,
+  PUBLIC_SPORTS,
   REFERRAL_SOURCES,
-  SPORTS,
   quoteFormSchema,
   type QuoteFormValues,
 } from '@mockup/shared';
@@ -65,7 +65,7 @@ export function QuoteForm() {
       email: '',
       phone: '',
       teamName: '',
-      sport: undefined,
+      sport: 'Flag Football',
       gender: undefined,
       ageGroup: undefined,
       primaryColor: '',
@@ -87,6 +87,14 @@ export function QuoteForm() {
     const entries = Object.entries(prefill) as Array<[keyof FormValues, unknown]>;
     for (const [key, value] of entries) {
       if (value === undefined || value === null || value === '') continue;
+      if (key === 'sport') {
+        const allowed = (PUBLIC_SPORTS as readonly string[]).includes(String(value));
+        methods.setValue('sport', (allowed ? value : 'Flag Football') as never, {
+          shouldValidate: false,
+          shouldDirty: false,
+        });
+        continue;
+      }
       const next =
         key === 'phone' && typeof value === 'string' ? formatUsPhone(value) : value;
       methods.setValue(key, next as never, { shouldValidate: false, shouldDirty: false });
@@ -221,7 +229,7 @@ export function QuoteForm() {
                 label="Sport"
                 requiredMark
                 placeholder="Select sport"
-                options={SPORTS}
+                options={PUBLIC_SPORTS}
                 error={errors.sport?.message}
                 {...register('sport')}
               />
