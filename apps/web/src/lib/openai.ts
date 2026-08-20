@@ -8,7 +8,8 @@ export function canGenerateMockups() {
 }
 
 type SampleFile = {
-  path: string;
+  path?: string;
+  buffer?: Buffer;
   filename: string;
   mimeType: string;
 };
@@ -59,7 +60,11 @@ export async function generateMockupImage(
     if (sampleFiles.length > 0) {
       const images = await Promise.all(
         sampleFiles.slice(0, 8).map(async (sample) => {
-          const buffer = await readFile(sample.path);
+          const buffer =
+            sample.buffer || (sample.path ? await readFile(sample.path) : null);
+          if (!buffer) {
+            throw new AppError(`Sample file missing: ${sample.filename}`, 500);
+          }
           return toFile(buffer, sample.filename, { type: sample.mimeType });
         }),
       );

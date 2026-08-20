@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
-import { resolveSampleAbsolutePaths } from '@/lib/knowledge-store';
+import { resolveSampleFiles } from '@/lib/knowledge-store';
 import { canGenerateMockups, generateMockupImage } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
 import { createSubmission, updateSubmission } from '@/lib/submission-store';
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       }).catch(() => undefined);
     }
 
-    const sampleFiles = await resolveSampleAbsolutePaths(profile);
+    const sampleFiles = await resolveSampleFiles(profile);
     const image = await generateMockupImage(prompt, sampleFiles);
 
     if (submissionId) {

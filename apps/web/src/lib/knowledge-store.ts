@@ -12,18 +12,26 @@ import {
   SPORTS,
 } from '@mockup/shared';
 import { AppError } from '@/lib/errors';
+import {
+  deleteBlob,
+  getBlobBytes,
+  getBlobText,
+  hasBlobStorage,
+  listBlobPathnames,
+  putBlob,
+} from '@/lib/blob-store';
+
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 /** Bundled with the app (readable on Vercel). */
 const BUNDLE_DIR = path.join(process.cwd(), 'data', 'knowledge', 'profiles');
 /** Writable overlay — local project dir, or /tmp on serverless. */
-const WRITE_DIR =
-  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
-    ? path.join('/tmp', 'mockup-knowledge', 'profiles')
-    : BUNDLE_DIR;
-const SAMPLES_WRITE_DIR =
-  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
-    ? path.join('/tmp', 'mockup-knowledge', 'samples')
-    : path.join(process.cwd(), 'public', 'knowledge', 'samples');
+const WRITE_DIR = isServerless
+  ? path.join('/tmp', 'mockup-knowledge', 'profiles')
+  : BUNDLE_DIR;
+const SAMPLES_WRITE_DIR = isServerless
+  ? path.join('/tmp', 'mockup-knowledge', 'samples')
+  : path.join(process.cwd(), 'public', 'knowledge', 'samples');
 const SAMPLES_PUBLIC_DIR = path.join(process.cwd(), 'public', 'knowledge', 'samples');
 
 /** In-memory overlay so the same serverless instance sees saves. */
@@ -35,6 +43,14 @@ function profileWritePath(slug: string) {
 
 function profileBundlePath(slug: string) {
   return path.join(BUNDLE_DIR, `${slug}.json`);
+}
+
+function profileBlobPath(slug: string) {
+  return `knowledge/profiles/${slug}.json`;
+}
+
+function sampleBlobPath(sportId: string, filename: string) {
+  return `knowledge/samples/${sportId}/${filename}`;
 }
 
 function sampleDir(slug: string) {
@@ -55,9 +71,27 @@ async function readJsonProfile(filePath: string): Promise<KnowledgeProfile | nul
   }
 }
 
+async function readProfileFromBlob(slug: string): Promise<KnowledgeProfile | null> {
+  if (!hasBlobStorage()) return null;
+  try {
+    const text = await getBlobText(profileBlobPath(slug));
+    if (!text) return null;
+    return knowledgeProfileSchema.parse(JSON.parse(text));
+  } catch (error) {
+    console.warn('[knowledge] blob profile read failed:', slug, error);
+    return null;
+  }
+}
+
 async function readProfileFile(slug: string): Promise<KnowledgeProfile | null> {
   const mem = memoryProfiles.get(slug);
   if (mem) return mem;
+
+  const fromBlob = await readProfileFromBlob(slug);
+  if (fromBlob) {
+    memoryProfiles.set(slug, fromBlob);
+    return fromBlob;
+  }
 
   const fromWrite = await readJsonProfile(profileWritePath(slug));
   if (fromWrite) return fromWrite;
@@ -71,21 +105,37 @@ async function readProfileFile(slug: string): Promise<KnowledgeProfile | null> {
 async function writeProfileFile(profile: KnowledgeProfile) {
   memoryProfiles.set(profile.id, profile);
   await ensureWriteDirs();
+
+  if (hasBlobStorage()) {
+    try {
+      await putBlob(
+        profileBlobPath(profile.id),
+        JSON.stringify(profile, null, 2),
+        'application/json',
+      );
+    } catch (error) {
+      console.error('[knowledge] blob profile write failed:', error);
+    }
+  }
+
   try {
     await writeFile(profileWritePath(profile.id), JSON.stringify(profile, null, 2), 'utf8');
   } catch (error) {
-    // Memory still holds the profile for this instance.
-    console.warn('[knowledge] disk write failed, using memory only:', error);
+    console.warn('[knowledge] disk write failed, using memory/blob only:', error);
   }
 }
 
 export async function ensureKnowledgeDefaults() {
   await ensureWriteDirs();
 
-  // Prefer seeding writable dir; if that fails, bundled/memory defaults still work.
   try {
-    const existing = await readdir(WRITE_DIR).catch(() => [] as string[]);
-    if (existing.some((name) => name.endsWith('.json'))) return;
+    if (hasBlobStorage()) {
+      const existing = await listBlobPathnames('knowledge/profiles/');
+      if (existing.some((p) => p.endsWith('.json'))) return;
+    }
+
+    const existingWrite = await readdir(WRITE_DIR).catch(() => [] as string[]);
+    if (existingWrite.some((name) => name.endsWith('.json'))) return;
 
     const bundled = await readdir(BUNDLE_DIR).catch(() => [] as string[]);
     if (bundled.some((name) => name.endsWith('.json'))) return;
@@ -93,7 +143,7 @@ export async function ensureKnowledgeDefaults() {
     const defaults = createDefaultKnowledgeProfiles();
     await Promise.all(defaults.map((profile) => writeProfileFile(profile)));
   } catch (error) {
-    console.warn('[knowledge] could not seed defaults on disk:', error);
+    console.warn('[knowledge] could not seed defaults:', error);
   }
 }
 
@@ -102,12 +152,10 @@ export async function listKnowledgeProfiles(): Promise<KnowledgeProfile[]> {
 
   const byId = new Map<string, KnowledgeProfile>();
 
-  // Defaults first.
   for (const profile of createDefaultKnowledgeProfiles()) {
     byId.set(profile.id, profile);
   }
 
-  // Bundled committed files.
   try {
     const files = await readdir(BUNDLE_DIR);
     for (const file of files) {
@@ -116,10 +164,9 @@ export async function listKnowledgeProfiles(): Promise<KnowledgeProfile[]> {
       if (profile) byId.set(profile.id, profile);
     }
   } catch {
-    // ignore missing bundle dir
+    // ignore
   }
 
-  // Writable overlay.
   try {
     const files = await readdir(WRITE_DIR);
     for (const file of files) {
@@ -131,12 +178,24 @@ export async function listKnowledgeProfiles(): Promise<KnowledgeProfile[]> {
     // ignore
   }
 
-  // Memory wins.
+  if (hasBlobStorage()) {
+    try {
+      const pathnames = await listBlobPathnames('knowledge/profiles/');
+      for (const pathname of pathnames) {
+        if (!pathname.endsWith('.json')) continue;
+        const slug = path.basename(pathname, '.json');
+        const profile = await readProfileFromBlob(slug);
+        if (profile) byId.set(profile.id, profile);
+      }
+    } catch (error) {
+      console.warn('[knowledge] blob list failed:', error);
+    }
+  }
+
   for (const [id, profile] of memoryProfiles) {
     byId.set(id, profile);
   }
 
-  // Guarantee every sport exists.
   for (const sport of SPORTS) {
     const slug = sportToSlug(sport);
     if (!byId.has(slug)) {
@@ -158,6 +217,7 @@ export async function getKnowledgeProfile(sportOrSlug: string): Promise<Knowledg
     SPORTS.find((s) => s.toLowerCase() === sportOrSlug.toLowerCase());
 
   if (byLabel) {
+    // Do not overwrite a remote profile we failed to read — only create if truly missing.
     const created = createDefaultKnowledgeProfile(byLabel);
     await writeProfileFile(created);
     return created;
@@ -176,6 +236,25 @@ export async function getKnowledgeProfile(sportOrSlug: string): Promise<Knowledg
   return createDefaultKnowledgeProfile(sportOrSlug || 'Other');
 }
 
+/**
+ * Always re-read the latest profile before mutating samples so we never
+ * overwrite Blob data with an empty default from another serverless instance.
+ */
+async function getFreshProfileForMutation(sportOrSlug: string): Promise<KnowledgeProfile> {
+  const slug = sportToSlug(sportOrSlug);
+  memoryProfiles.delete(slug);
+
+  if (hasBlobStorage()) {
+    const fromBlob = await readProfileFromBlob(slug);
+    if (fromBlob) {
+      memoryProfiles.set(slug, fromBlob);
+      return fromBlob;
+    }
+  }
+
+  return getKnowledgeProfile(sportOrSlug);
+}
+
 export async function saveKnowledgeProfile(
   sportOrSlug: string,
   patch: Partial<
@@ -185,8 +264,11 @@ export async function saveKnowledgeProfile(
     >
   >,
 ): Promise<KnowledgeProfile> {
-  await ensureKnowledgeDefaults();
-  const current = await getKnowledgeProfile(sportOrSlug);
+  const current =
+    patch.sampleImages !== undefined
+      ? await getFreshProfileForMutation(sportOrSlug)
+      : await getKnowledgeProfile(sportOrSlug);
+
   const next: KnowledgeProfile = knowledgeProfileSchema.parse({
     ...current,
     ...patch,
@@ -211,7 +293,7 @@ export async function addKnowledgeSample(input: {
     throw new AppError('Sample must be PNG, JPEG, or WebP', 400);
   }
 
-  const profile = await getKnowledgeProfile(input.sportOrSlug);
+  const profile = await getFreshProfileForMutation(input.sportOrSlug);
   const ext =
     input.mimeType === 'image/webp'
       ? '.webp'
@@ -221,81 +303,148 @@ export async function addKnowledgeSample(input: {
 
   const id = randomUUID();
   const filename = `${id}${ext}`;
-  const dir = sampleDir(profile.id);
-  await mkdir(dir, { recursive: true });
+  const pathname = sampleBlobPath(profile.id, filename);
 
-  try {
-    await writeFile(path.join(dir, filename), input.buffer);
-  } catch {
-    throw new AppError(
-      'Could not store sample image on this host. Use a VPS or object storage for persistent uploads.',
-      503,
-    );
+  let url = `/api/knowledge/${profile.id}/samples/file/${filename}`;
+
+  if (hasBlobStorage()) {
+    try {
+      const uploaded = await putBlob(pathname, input.buffer, input.mimeType);
+      // Prefer API proxy URL so private blobs still render in admin.
+      url = `/api/knowledge/${profile.id}/samples/file/${filename}`;
+      void uploaded;
+    } catch (error) {
+      console.error('[knowledge] blob sample upload failed:', error);
+      throw new AppError(
+        'Could not store sample in Blob. Check BLOB_READ_WRITE_TOKEN / store access.',
+        503,
+      );
+    }
+  } else {
+    const dir = sampleDir(profile.id);
+    await mkdir(dir, { recursive: true });
+    try {
+      await writeFile(path.join(dir, filename), input.buffer);
+      if (!isServerless) {
+        url = `/knowledge/samples/${profile.id}/${filename}`;
+      }
+    } catch {
+      throw new AppError(
+        'Could not store sample image on this host. Configure BLOB_READ_WRITE_TOKEN.',
+        503,
+      );
+    }
   }
 
   const sample: KnowledgeSample = {
     id,
     filename,
-    // Served via API on serverless; public path locally when under public/
-    url:
-      process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
-        ? `/api/knowledge/${profile.id}/samples/file/${filename}`
-        : `/knowledge/samples/${profile.id}/${filename}`,
+    pathname: hasBlobStorage() ? pathname : undefined,
+    url,
     caption: input.caption?.trim() || '',
     uploadedAt: new Date().toISOString(),
   };
 
-  return saveKnowledgeProfile(profile.id, {
+  const next: KnowledgeProfile = knowledgeProfileSchema.parse({
+    ...profile,
     sampleImages: [...profile.sampleImages, sample],
+    updatedAt: new Date().toISOString(),
   });
+  await writeProfileFile(next);
+  return next;
 }
 
 export async function removeKnowledgeSample(
   sportOrSlug: string,
   sampleId: string,
 ): Promise<KnowledgeProfile> {
-  const profile = await getKnowledgeProfile(sportOrSlug);
+  const profile = await getFreshProfileForMutation(sportOrSlug);
   const sample = profile.sampleImages.find((s) => s.id === sampleId);
   if (!sample) throw new AppError('Sample not found', 404);
 
+  if (sample.pathname) {
+    await deleteBlob(sample.pathname);
+  }
   await unlink(path.join(sampleDir(profile.id), sample.filename)).catch(() => undefined);
   await unlink(path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename)).catch(() => undefined);
 
-  return saveKnowledgeProfile(profile.id, {
+  const next: KnowledgeProfile = knowledgeProfileSchema.parse({
+    ...profile,
     sampleImages: profile.sampleImages.filter((s) => s.id !== sampleId),
+    updatedAt: new Date().toISOString(),
   });
+
+  // Safety: never persist an accidental full wipe when we expected one removal
+  // but somehow lost the list (should not happen after getFreshProfileForMutation).
+  if (
+    next.sampleImages.length === 0 &&
+    profile.sampleImages.length > 1
+  ) {
+    throw new AppError('Refusing to remove all samples from a partial delete', 500);
+  }
+
+  await writeProfileFile(next);
+  return next;
 }
 
-export async function resolveSampleAbsolutePaths(profile: KnowledgeProfile): Promise<
-  Array<{ path: string; filename: string; mimeType: string }>
-> {
-  const results: Array<{ path: string; filename: string; mimeType: string }> = [];
+export type ResolvedSample = {
+  filename: string;
+  mimeType: string;
+  path?: string;
+  buffer?: Buffer;
+};
+
+export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<ResolvedSample[]> {
+  const results: ResolvedSample[] = [];
 
   for (const sample of profile.sampleImages) {
+    const ext = path.extname(sample.filename).toLowerCase();
+    const mimeType =
+      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+
+    if (sample.pathname && hasBlobStorage()) {
+      const bytes = await getBlobBytes(sample.pathname);
+      if (bytes) {
+        results.push({ filename: sample.filename, mimeType, buffer: bytes.buffer });
+        continue;
+      }
+    }
+
+    // Fallback pathname convention for older samples.
+    if (hasBlobStorage()) {
+      const guessed = sampleBlobPath(profile.id, sample.filename);
+      const bytes = await getBlobBytes(guessed);
+      if (bytes) {
+        results.push({ filename: sample.filename, mimeType, buffer: bytes.buffer });
+        continue;
+      }
+    }
+
     const candidates = [
       path.join(SAMPLES_WRITE_DIR, profile.id, sample.filename),
       path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename),
     ];
 
-    let absolute: string | null = null;
     for (const candidate of candidates) {
       try {
         await access(candidate);
-        absolute = candidate;
+        results.push({ path: candidate, filename: sample.filename, mimeType });
         break;
       } catch {
         // try next
       }
     }
-    if (!absolute) continue;
-
-    const ext = path.extname(sample.filename).toLowerCase();
-    const mimeType =
-      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-    results.push({ path: absolute, filename: sample.filename, mimeType });
   }
 
   return results;
+}
+
+/** @deprecated Prefer resolveSampleFiles */
+export async function resolveSampleAbsolutePaths(profile: KnowledgeProfile) {
+  const files = await resolveSampleFiles(profile);
+  return files
+    .filter((f): f is ResolvedSample & { path: string } => Boolean(f.path))
+    .map((f) => ({ path: f.path, filename: f.filename, mimeType: f.mimeType }));
 }
 
 export function getSampleFilePath(sportSlug: string, filename: string) {
@@ -303,5 +452,32 @@ export function getSampleFilePath(sportSlug: string, filename: string) {
   return {
     writePath: path.join(SAMPLES_WRITE_DIR, sportSlug, safeName),
     publicPath: path.join(SAMPLES_PUBLIC_DIR, sportSlug, safeName),
+    blobPath: sampleBlobPath(sportSlug, safeName),
   };
+}
+
+export async function readSampleBytes(
+  sportSlug: string,
+  filename: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const safeName = path.basename(filename);
+  const ext = path.extname(safeName).toLowerCase();
+  const contentType =
+    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+
+  if (hasBlobStorage()) {
+    const fromBlob = await getBlobBytes(sampleBlobPath(sportSlug, safeName));
+    if (fromBlob) return fromBlob;
+  }
+
+  const { writePath, publicPath } = getSampleFilePath(sportSlug, safeName);
+  for (const candidate of [writePath, publicPath]) {
+    try {
+      const buffer = await readFile(candidate);
+      return { buffer, contentType };
+    } catch {
+      // try next
+    }
+  }
+  return null;
 }

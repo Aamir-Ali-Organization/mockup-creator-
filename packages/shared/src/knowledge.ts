@@ -5,6 +5,8 @@ export const knowledgeSampleSchema = z.object({
   id: z.string(),
   filename: z.string(),
   url: z.string(),
+  /** Vercel Blob pathname when stored remotely. */
+  pathname: z.string().optional(),
   caption: z.string().optional().default(''),
   uploadedAt: z.string(),
 });
