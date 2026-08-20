@@ -439,6 +439,51 @@ export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<Res
   return results;
 }
 
+/**
+ * Prefer this sport's samples; if missing/empty, borrow brand samples from other sports
+ * so style references still reach OpenAI (samples are otherwise per-sport only).
+ */
+export async function collectStyleReferenceSamples(
+  primary: KnowledgeProfile,
+  max = 5,
+): Promise<{ samples: ResolvedSample[]; sampleCountForPrompt: number; source: string }> {
+  const primaryFiles = await resolveSampleFiles(primary);
+  if (primaryFiles.length > 0) {
+    return {
+      samples: primaryFiles.slice(0, max),
+      sampleCountForPrompt: primaryFiles.length,
+      source: primary.id,
+    };
+  }
+
+  const all = await listKnowledgeProfiles();
+  const merged: ResolvedSample[] = [];
+  const seen = new Set<string>();
+  const sources: string[] = [];
+
+  for (const profile of all) {
+    if (profile.id === primary.id) continue;
+    if (!profile.sampleImages.length) continue;
+    const files = await resolveSampleFiles(profile);
+    if (!files.length) continue;
+    sources.push(profile.id);
+    for (const file of files) {
+      const key = `${profile.id}:${file.filename}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(file);
+      if (merged.length >= max) break;
+    }
+    if (merged.length >= max) break;
+  }
+
+  return {
+    samples: merged.slice(0, max),
+    sampleCountForPrompt: merged.length,
+    source: sources.length ? `brand-fallback:${sources.join(',')}` : 'none',
+  };
+}
+
 /** @deprecated Prefer resolveSampleFiles */
 export async function resolveSampleAbsolutePaths(profile: KnowledgeProfile) {
   const files = await resolveSampleFiles(profile);
