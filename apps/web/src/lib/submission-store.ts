@@ -47,6 +47,10 @@ export const submissionRecordSchema = z.object({
   imageUrl: z.string().nullable().optional(),
   errorMessage: z.string().nullable().optional(),
   skipMockup: z.boolean().optional().default(false),
+  hasLogo: z.boolean().optional().default(false),
+  logoFilename: z.string().nullable().optional(),
+  logoMimeType: z.string().nullable().optional(),
+  logoPathname: z.string().nullable().optional(),
 });
 
 export type SubmissionJob = z.infer<typeof submissionJobSchema>;
@@ -170,6 +174,16 @@ function blobMetaPath(id: string) {
 
 function blobImagePath(id: string, ext: string) {
   return `submissions/${id}/mockup${ext}`;
+}
+
+function blobLogoPath(id: string, filename: string) {
+  const safe = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'logo.png';
+  return `submissions/${id}/logo-${safe}`;
+}
+
+function logoLocalPath(root: string, id: string, filename: string) {
+  const safe = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'logo.png';
+  return path.join(root, 'images', `${id}-logo-${safe}`);
 }
 
 function errorMessage(error: unknown) {
@@ -394,9 +408,95 @@ export async function createSubmission(input: {
     imageUrl: null,
     errorMessage: null,
     skipMockup: Boolean(input.skipMockup),
+    hasLogo: false,
+    logoFilename: null,
+    logoMimeType: null,
+    logoPathname: null,
   };
   await persistRecord(record);
   return record;
+}
+
+const LOGO_MIME_ALLOW = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+
+export async function saveSubmissionLogo(
+  id: string,
+  file: { buffer: Buffer; filename: string; mimeType: string },
+): Promise<SubmissionRecord> {
+  const current = await readRecord(id);
+  if (!current) throw new AppError('Submission not found', 404);
+
+  const mime = (file.mimeType || 'image/png').toLowerCase();
+  if (!LOGO_MIME_ALLOW.has(mime) && !mime.startsWith('image/')) {
+    throw new AppError('Logo must be a PNG, JPEG, or WebP image', 400);
+  }
+
+  const filename = path.basename(file.filename) || 'logo.png';
+  const pathname = blobLogoPath(id, filename);
+  let logoPathname: string | null = null;
+
+  if (hasBlobStorage()) {
+    try {
+      await putBlob(pathname, file.buffer, mime);
+      logoPathname = pathname;
+    } catch (error) {
+      console.error('[submissions] blob logo write failed:', error);
+      lastBlobError = errorMessage(error);
+    }
+  }
+
+  if (!logoPathname) {
+    const root = await resolveWriteRoot();
+    const localPath = logoLocalPath(root, id, filename);
+    await writeFile(localPath, file.buffer);
+    logoPathname = localPath;
+  }
+
+  const next: SubmissionRecord = submissionRecordSchema.parse({
+    ...current,
+    hasLogo: true,
+    logoFilename: filename,
+    logoMimeType: mime === 'image/jpg' ? 'image/jpeg' : mime,
+    logoPathname,
+    updatedAt: new Date().toISOString(),
+  });
+  await persistRecord(next);
+  return next;
+}
+
+export async function readSubmissionLogo(
+  id: string,
+): Promise<{ buffer: Buffer; filename: string; mimeType: string } | null> {
+  const record = await readRecord(id);
+  if (!record?.hasLogo || !record.logoPathname) return null;
+
+  const filename = record.logoFilename || 'logo.png';
+  const mimeType = record.logoMimeType || 'image/png';
+
+  if (record.logoPathname.startsWith('submissions/') && hasBlobStorage()) {
+    const fromBlob = await getBlobBytes(record.logoPathname);
+    if (fromBlob) {
+      return { buffer: fromBlob.buffer, filename, mimeType: fromBlob.contentType || mimeType };
+    }
+  }
+
+  try {
+    const buffer = await readFile(record.logoPathname);
+    return { buffer, filename, mimeType };
+  } catch {
+    // try local convention
+  }
+
+  for (const root of candidateRoots()) {
+    try {
+      const buffer = await readFile(logoLocalPath(root, id, filename));
+      return { buffer, filename, mimeType };
+    } catch {
+      // try next
+    }
+  }
+
+  return null;
 }
 
 export async function updateSubmission(

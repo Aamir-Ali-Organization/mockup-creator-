@@ -1,4 +1,9 @@
-import type { AiPromptPayload, KnowledgeProfile } from '@mockup/shared';
+import {
+  LOGO_ATTACH_OPTION,
+  LOGO_CREATE_OPTION,
+  type AiPromptPayload,
+  type KnowledgeProfile,
+} from '@mockup/shared';
 
 export type QuotePromptInput = {
   teamName: string;
@@ -12,13 +17,65 @@ export type QuotePromptInput = {
   accessories: string[];
   logoFile?: string | null;
   logoCreation?: string | null;
+  hasLogoFile?: boolean;
   rosterInfo?: string | null;
 };
 
+function resolveLogoMode(quote: QuotePromptInput): {
+  wantsLogo: boolean;
+  hasLogoFile: boolean;
+  createLogo: boolean;
+} {
+  const creation = (quote.logoCreation || '').trim();
+  const hasLogoFile = Boolean(quote.hasLogoFile || quote.logoFile);
+  const createLogo = creation === LOGO_CREATE_OPTION || creation.toLowerCase().includes('yes');
+  const attachLogo = creation === LOGO_ATTACH_OPTION;
+  return {
+    wantsLogo: hasLogoFile || createLogo || attachLogo,
+    hasLogoFile,
+    createLogo: createLogo && !hasLogoFile,
+  };
+}
+
+export function buildLogoPromptLine(
+  payload: AiPromptPayload,
+  teamName: string,
+): string {
+  if (payload.hasLogoFile) {
+    return [
+      `CUSTOMER LOGO ATTACHED: The first attached reference image is the official team logo for ${teamName}.`,
+      'Reproduce that logo faithfully on the uniform (chest primary; optional sleeve/hat if natural).',
+      'Keep logo colors, shapes, and proportions accurate. Do not invent a different mascot or replace the logo.',
+      'Do not treat style-sample uniforms as the logo source.',
+    ].join(' ');
+  }
+
+  if (payload.logoCreation === LOGO_CREATE_OPTION) {
+    return [
+      `LOGO CREATION REQUESTED: Invent a bold, original Big Mad Drip team logo/mascot for ${teamName}.`,
+      'Make it aggressive, custom, and production-ready (readable at jersey size; works for embroidery/print).',
+      `Use the team colors (${payload.colors.primary} / ${payload.colors.secondary}) in the logo.`,
+      'Place the new logo prominently on the chest as the main graphic — not a plain wordmark-only jersey.',
+      'Do not copy logos from style reference samples.',
+    ].join(' ');
+  }
+
+  if (payload.logo) {
+    return [
+      `Create a bold original chest graphic/mascot for ${teamName} in Big Mad Drip style.`,
+      'Keep branding readable for production. Do not copy logos from style samples.',
+    ].join(' ');
+  }
+
+  return [
+    `No customer logo file was provided. Invent a bold original team mascot/graphic for ${teamName}`,
+    'and place it as a strong chest graphic — aggressive Big Mad Drip style, not a plain wordmark-only jersey.',
+    'Do not copy logos from style reference samples.',
+  ].join(' ');
+}
+
 export function buildAiPromptPayload(quote: QuotePromptInput): AiPromptPayload {
-  const wantsLogo =
-    Boolean(quote.logoFile) ||
-    Boolean(quote.logoCreation && quote.logoCreation.toLowerCase().includes('yes'));
+  const { wantsLogo, hasLogoFile } = resolveLogoMode(quote);
 
   return {
     team: {
@@ -36,6 +93,7 @@ export function buildAiPromptPayload(quote: QuotePromptInput): AiPromptPayload {
     accessories: quote.accessories,
     logo: wantsLogo,
     logoCreation: quote.logoCreation || undefined,
+    hasLogoFile,
     rosterInfo: quote.rosterInfo || undefined,
   };
 }
@@ -54,16 +112,19 @@ function fillTemplate(
 export function buildPromptFromProfile(
   profile: KnowledgeProfile,
   payload: AiPromptPayload,
-  options?: { referenceSampleCount?: number },
+  options?: { referenceSampleCount?: number; hasLogoFile?: boolean },
 ): string {
   const accessories =
     payload.accessories.length > 0
       ? payload.accessories.join(', ')
       : 'no additional accessories';
 
-  const logoLine = payload.logo
-    ? 'Incorporate a bold custom team logo prominently on the chest and keep branding readable for production.'
-    : 'No logo file was uploaded. Invent a bold original team mascot/graphic for this team name and place it as a strong chest graphic — aggressive Big Mad Drip style, not a plain wordmark-only jersey.';
+  const payloadWithLogo: AiPromptPayload = {
+    ...payload,
+    hasLogoFile: options?.hasLogoFile ?? payload.hasLogoFile ?? false,
+  };
+
+  const logoLine = buildLogoPromptLine(payloadWithLogo, payload.team.name);
 
   const alternate = payload.colors.alternate
     ? `Use ${payload.colors.alternate} as the sharp accent color.`
@@ -91,6 +152,7 @@ export function buildPromptFromProfile(
 
   const sampleCount =
     options?.referenceSampleCount ?? profile.sampleImages.length;
+  const hasLogo = Boolean(payloadWithLogo.hasLogoFile);
 
   const parts = [
     profile.instructions.trim(),
@@ -98,9 +160,11 @@ export function buildPromptFromProfile(
       ? `Knowledge base for ${profile.label}:\n${profile.knowledgeBase.trim()}`
       : '',
     `Task:\n${filled}`,
-    sampleCount > 0
-      ? `Reference sample images are attached (${sampleCount}). Match their quality, garment construction, lighting, aggressive sublimated graphic style, and presentation. Create a NEW ${payload.team.sport} uniform for ${payload.team.name} only — do not copy logos, names, or numbers from the samples.`
-      : 'No reference sample images were attached for this generation.',
+    hasLogo
+      ? 'Image order: (1) customer logo — use exactly on the uniform; (2+) style sample uniforms — match quality/construction/lighting only, never copy their logos/names/numbers.'
+      : sampleCount > 0
+        ? `Reference sample images are attached (${sampleCount}). Match their quality, garment construction, lighting, aggressive sublimated graphic style, and presentation. Create a NEW ${payload.team.sport} uniform for ${payload.team.name} only — do not copy logos, names, or numbers from the samples.`
+        : 'No reference sample images were attached for this generation.',
   ].filter(Boolean);
 
   return parts.join('\n\n');
@@ -113,9 +177,7 @@ export function buildPrompt(payload: AiPromptPayload): string {
       ? payload.accessories.join(', ')
       : 'no additional accessories';
 
-  const logoLine = payload.logo
-    ? 'Incorporate a bold custom team logo prominently on the chest and keep branding readable for production.'
-    : 'No logo file was uploaded. Invent a bold original team mascot/graphic for this team name as a strong chest graphic — not a plain wordmark-only jersey.';
+  const logoLine = buildLogoPromptLine(payload, payload.team.name);
 
   const alternate = payload.colors.alternate
     ? `Use ${payload.colors.alternate} as the sharp accent color.`
@@ -157,6 +219,7 @@ export async function buildPromptFromQuoteWithKnowledge(quote: QuotePromptInput)
   const refs = await collectStyleReferenceSamples(profile, 5);
   const prompt = buildPromptFromProfile(profile, payload, {
     referenceSampleCount: refs.sampleCountForPrompt,
+    hasLogoFile: payload.hasLogoFile,
   });
   return { payload, prompt, profile, sampleFiles: refs.samples };
 }

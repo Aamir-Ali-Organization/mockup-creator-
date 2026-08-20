@@ -156,6 +156,8 @@ export const aiPromptPayloadSchema = z.object({
   accessories: z.array(z.string()),
   logo: z.boolean(),
   logoCreation: z.string().optional(),
+  /** True when a customer logo file was stored and will be sent to OpenAI. */
+  hasLogoFile: z.boolean().optional().default(false),
   rosterInfo: z.string().optional(),
 });
 

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KnowledgeProfile } from '@mockup/shared';
+import { PUBLIC_SPORTS, sportToSlug, type KnowledgeProfile } from '@mockup/shared';
 import { KNOWLEDGE_PLACEHOLDERS } from '@mockup/shared';
 
 type ProfileSummary = {
@@ -15,14 +15,34 @@ type ProfileSummary = {
   updatedAt: string;
 };
 
-type EditorTab = 'instructions' | 'knowledge' | 'template' | 'samples';
+type EditorTab = 'samples' | 'instructions' | 'knowledge' | 'template';
 
 const TABS: Array<{ id: EditorTab; label: string; hint: string }> = [
-  { id: 'instructions', label: 'Instructions', hint: 'Brand rules the model must always follow' },
-  { id: 'knowledge', label: 'Knowledge', hint: 'Playbook notes and style guidance for this sport' },
-  { id: 'template', label: 'Prompt', hint: 'Fill-in template used for each quote' },
-  { id: 'samples', label: 'Samples', hint: 'Reference mockups that steer visual style' },
+  {
+    id: 'samples',
+    label: 'Examples',
+    hint: 'Upload 3–5 mockups you love. New designs will match this look.',
+  },
+  {
+    id: 'instructions',
+    label: 'Style rules',
+    hint: 'Short must-follow rules in plain English (pose, quality, what to avoid).',
+  },
+  {
+    id: 'knowledge',
+    label: 'Notes',
+    hint: 'Optional tips for this sport — colors, garment style, anything helpful.',
+  },
+  {
+    id: 'template',
+    label: 'Advanced',
+    hint: 'Optional. Only change this if you know how prompt templates work.',
+  },
 ];
+
+const PUBLIC_SPORT_IDS = new Set(
+  PUBLIC_SPORTS.map((sport) => sportToSlug(sport)),
+);
 
 async function readJson<T>(res: Response): Promise<T> {
   const data = (await res.json()) as T & { message?: string; success?: boolean };
@@ -79,7 +99,8 @@ export function KnowledgeAdminClient() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sportQuery, setSportQuery] = useState('');
-  const [tab, setTab] = useState<EditorTab>('instructions');
+  const [tab, setTab] = useState<EditorTab>('samples');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const templateRef = useRef<HTMLTextAreaElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -177,7 +198,7 @@ export function KnowledgeAdminClient() {
 
   const filteredSports = useMemo(() => {
     const q = sportQuery.trim().toLowerCase();
-    const list = listQuery.data ?? [];
+    const list = (listQuery.data ?? []).filter((p) => PUBLIC_SPORT_IDS.has(p.id));
     if (!q) return list;
     return list.filter(
       (p) => p.label.toLowerCase().includes(q) || p.sport.toLowerCase().includes(q),
@@ -185,12 +206,12 @@ export function KnowledgeAdminClient() {
   }, [listQuery.data, sportQuery]);
 
   const selectedSport = useMemo(() => {
-    if (!listQuery.data?.length) return null;
+    if (!filteredSports.length) return null;
     if (selectedId) {
-      return listQuery.data.find((p) => p.id === selectedId) ?? listQuery.data[0];
+      return filteredSports.find((p) => p.id === selectedId) ?? filteredSports[0];
     }
-    return listQuery.data[0];
-  }, [listQuery.data, selectedId]);
+    return filteredSports[0];
+  }, [filteredSports, selectedId]);
 
   const detailQuery = useQuery({
     queryKey: ['knowledge-profile', selectedSport?.id],
@@ -284,7 +305,7 @@ export function KnowledgeAdminClient() {
     },
     onSuccess: (data) => {
       setDraft(data.profile);
-      showToast('Sample uploaded');
+      showToast('Example uploaded');
       void queryClient.invalidateQueries({ queryKey: ['knowledge-profiles'] });
     },
     onError: (err: Error) => showToast(err.message, 'err'),
@@ -350,9 +371,9 @@ export function KnowledgeAdminClient() {
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-accent">
               Big Mad Drip
             </p>
-            <h1 className="font-display text-5xl tracking-wide text-white">Knowledge Admin</h1>
+            <h1 className="font-display text-5xl tracking-wide text-white">Style Admin</h1>
             <p className="mt-3 text-sm leading-relaxed text-white/55">
-              Sign in to shape sport prompts, knowledge, and sample references.
+              Upload example uniforms and add short style notes.
             </p>
           </div>
 
@@ -413,7 +434,7 @@ export function KnowledgeAdminClient() {
               Big Mad Drip · Admin
             </p>
             <h1 className="font-display truncate text-2xl tracking-wide text-white sm:text-3xl">
-              Knowledge Base
+              Style Guide
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -454,35 +475,18 @@ export function KnowledgeAdminClient() {
         <aside className="border-b border-white/10 lg:min-h-[calc(100vh-73px)] lg:border-b-0 lg:border-r">
           <div className="sticky top-[73px] space-y-3 p-4 sm:p-5">
             <div>
-              <p className="field-label mb-2">Sport / form type</p>
-              <input
-                className="input-field !py-2.5 text-sm"
-                placeholder="Search sports…"
-                value={sportQuery}
-                onChange={(e) => setSportQuery(e.target.value)}
-              />
+              <p className="field-label mb-2">Sport</p>
+              {filteredSports.length > 1 ? (
+                <input
+                  className="input-field !py-2.5 text-sm"
+                  placeholder="Search…"
+                  value={sportQuery}
+                  onChange={(e) => setSportQuery(e.target.value)}
+                />
+              ) : (
+                <p className="text-sm text-white/45">Currently showing Flag Football only.</p>
+              )}
             </div>
-
-            {/* Mobile sport select */}
-            <label className="block lg:hidden">
-              <span className="sr-only">Select sport</span>
-              <select
-                className="input-field"
-                value={selectedSport?.id ?? ''}
-                onChange={(e) => {
-                  setSelectedId(e.target.value);
-                  setStatus(null);
-                  setError(null);
-                }}
-              >
-                {(listQuery.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                    {!p.enabled ? ' (off)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
 
             <div className="hidden max-h-[calc(100vh-220px)] flex-col gap-1 overflow-y-auto pr-1 lg:flex">
               {listQuery.isLoading && (
@@ -532,8 +536,8 @@ export function KnowledgeAdminClient() {
                         active ? 'text-ink/65' : 'text-white/40'
                       }`}
                     >
-                      {profile.sampleCount} sample{profile.sampleCount === 1 ? '' : 's'}
-                      {!profile.enabled ? ' · disabled' : ''}
+                      {profile.sampleCount} example{profile.sampleCount === 1 ? '' : 's'}
+                      {!profile.enabled ? ' · off' : ''}
                     </span>
                   </button>
                 );
@@ -599,7 +603,7 @@ export function KnowledgeAdminClient() {
                     {draft.label}
                   </h2>
                   <p className="mt-1 text-sm text-white/45">
-                    Updated {relativeTime(draft.updatedAt)} · used when a lead picks this sport
+                    Updated {relativeTime(draft.updatedAt)}
                   </p>
                 </div>
                 <button
@@ -609,7 +613,7 @@ export function KnowledgeAdminClient() {
                   onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}
                   className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5"
                 >
-                  <span className="text-sm text-white/70">Enabled</span>
+                  <span className="text-sm text-white/70">On</span>
                   <span
                     className={`relative h-6 w-11 rounded-full transition ${
                       draft.enabled ? 'bg-accent' : 'bg-white/20'
@@ -624,9 +628,9 @@ export function KnowledgeAdminClient() {
                 </button>
               </div>
 
-              {/* Tabs */}
+              {/* Tabs — Advanced hidden until expanded */}
               <div className="flex gap-1 overflow-x-auto border-b border-white/10 pb-px">
-                {TABS.map((item) => {
+                {TABS.filter((item) => item.id !== 'template' || showAdvanced).map((item) => {
                   const active = tab === item.id;
                   const count =
                     item.id === 'samples' ? draft.sampleImages.length : undefined;
@@ -655,36 +659,51 @@ export function KnowledgeAdminClient() {
                     </button>
                   );
                 })}
+                {!showAdvanced ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdvanced(true);
+                      setTab('template');
+                    }}
+                    className="shrink-0 px-4 py-3 text-sm font-semibold text-white/35 hover:text-white/60"
+                  >
+                    Advanced…
+                  </button>
+                ) : null}
               </div>
 
               <p className="text-sm text-white/50">{activeTab.hint}</p>
 
               {tab === 'instructions' && (
                 <label className="block space-y-2">
-                  <span className="field-label">Instructions</span>
+                  <span className="field-label">Style rules</span>
                   <textarea
-                    className="input-field min-h-[320px] resize-y font-mono text-[13px] leading-relaxed"
+                    className="input-field min-h-[240px] resize-y text-sm leading-relaxed"
                     value={draft.instructions}
                     onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
-                    placeholder="Always-on brand and quality rules…"
+                    placeholder="Example: Always show the full uniform head to toe. Bold graphics. Clean white background. No watermarks."
                   />
                 </label>
               )}
 
               {tab === 'knowledge' && (
                 <label className="block space-y-2">
-                  <span className="field-label">Knowledge base</span>
+                  <span className="field-label">Extra notes</span>
                   <textarea
-                    className="input-field min-h-[320px] resize-y font-mono text-[13px] leading-relaxed"
+                    className="input-field min-h-[240px] resize-y text-sm leading-relaxed"
                     value={draft.knowledgeBase}
                     onChange={(e) => setDraft({ ...draft, knowledgeBase: e.target.value })}
-                    placeholder="Sport-specific playbook notes, garment details, style language…"
+                    placeholder="Optional. Example: Compression tops + shorts. Aggressive mascot graphics. Keep numbers readable."
                   />
                 </label>
               )}
 
               {tab === 'template' && (
                 <div className="space-y-3">
+                  <p className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/55">
+                    You can skip this. Examples + style rules are enough for most teams.
+                  </p>
                   <div className="space-y-2">
                     <span className="field-label">Insert placeholder</span>
                     <PlaceholderChips onInsert={insertPlaceholder} />
@@ -693,7 +712,7 @@ export function KnowledgeAdminClient() {
                     <span className="field-label">Prompt template</span>
                     <textarea
                       ref={templateRef}
-                      className="input-field min-h-[320px] resize-y font-mono text-[13px] leading-relaxed"
+                      className="input-field min-h-[240px] resize-y font-mono text-[13px] leading-relaxed"
                       value={draft.promptTemplate}
                       onChange={(e) => setDraft({ ...draft, promptTemplate: e.target.value })}
                       placeholder="Create a premium custom {{sport}} uniform for {{teamName}}…"
@@ -723,13 +742,13 @@ export function KnowledgeAdminClient() {
                     }`}
                   >
                     <p className="font-display text-2xl tracking-wide text-white">
-                      Drop sample mockups here
+                      Drop example uniforms here
                     </p>
                     <p className="mt-2 text-sm text-white/45">
-                      PNG, JPEG, or WebP · used as OpenAI style references
+                      PNG or JPEG · these teach the AI your look
                     </p>
                     <label className="btn-ghost mt-5 inline-flex cursor-pointer !px-5 !py-2.5 text-sm">
-                      {uploadMutation.isPending ? 'Uploading…' : 'Browse files'}
+                      {uploadMutation.isPending ? 'Uploading…' : 'Choose photos'}
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
@@ -746,9 +765,9 @@ export function KnowledgeAdminClient() {
 
                   {draft.sampleImages.length === 0 ? (
                     <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-6 py-12 text-center">
-                      <p className="text-white/55">No samples for {draft.label} yet.</p>
+                      <p className="text-white/55">No examples yet for {draft.label}.</p>
                       <p className="mt-1 text-sm text-white/35">
-                        Add a few winning mockups so new generations match your look.
+                        Add a few winning mockups — that is the most important step.
                       </p>
                     </div>
                   ) : (

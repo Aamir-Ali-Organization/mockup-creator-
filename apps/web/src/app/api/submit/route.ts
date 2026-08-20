@@ -1,10 +1,10 @@
-import { createQuoteBodySchema } from '@mockup/shared';
+import { createQuoteBodySchema, LOGO_ATTACH_OPTION } from '@mockup/shared';
 import { env } from '@/lib/env';
 import { toErrorResponse, AppError } from '@/lib/errors';
 import { isGhlReady, resolveLeadByFleadid, upsertLeadInGhl } from '@/lib/ghl';
 import { canGenerateMockups } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
-import { createSubmission } from '@/lib/submission-store';
+import { createSubmission, saveSubmissionLogo } from '@/lib/submission-store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -13,10 +13,17 @@ function parseAccessories(value: FormDataEntryValue[]): string[] {
   return value.map(String).filter(Boolean);
 }
 
+function asUploadFile(value: FormDataEntryValue | null): File | null {
+  if (!value || typeof value === 'string') return null;
+  if (!(value instanceof File) || value.size <= 0) return null;
+  return value;
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const accessories = parseAccessories(formData.getAll('accessories'));
+    const logoUpload = asUploadFile(formData.get('logoFile'));
 
     const parsed = createQuoteBodySchema.safeParse({
       customerName: formData.get('customerName'),
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
       fleadid: formData.get('fleadid') || null,
       ghlContactId: formData.get('ghlContactId') || null,
       rosterFile: null,
-      logoFile: formData.get('logoFile') ? 'attached' : null,
+      logoFile: logoUpload ? 'attached' : null,
     });
 
     if (!parsed.success) {
@@ -45,6 +52,10 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
+    if (data.logoCreation === LOGO_ATTACH_OPTION && !logoUpload) {
+      throw new AppError('Attach your logo file', 400);
+    }
+
     const fleadid = data.fleadid || null;
     const ghlContactId = data.ghlContactId || null;
 
@@ -64,7 +75,8 @@ export async function POST(request: Request) {
       alternateColor: data.alternateColor,
       quantity: data.quantity,
       accessories: data.accessories,
-      logoFile: data.logoFile,
+      logoFile: logoUpload ? 'attached' : null,
+      hasLogoFile: Boolean(logoUpload),
       logoCreation: data.logoCreation || null,
       rosterInfo: data.rosterInfo,
     });
@@ -124,6 +136,15 @@ export async function POST(request: Request) {
         skipMockup,
       });
       submissionId = submission.id;
+
+      if (logoUpload) {
+        const buffer = Buffer.from(await logoUpload.arrayBuffer());
+        await saveSubmissionLogo(submission.id, {
+          buffer,
+          filename: logoUpload.name || 'logo.png',
+          mimeType: logoUpload.type || 'image/png',
+        });
+      }
     } catch (logError) {
       console.error('[submit] failed to log submission:', logError);
     }

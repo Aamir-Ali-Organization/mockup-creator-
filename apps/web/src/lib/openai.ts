@@ -45,10 +45,12 @@ function extractImageDataUrl(image: {
 export async function generateMockupImage(
   prompt: string,
   sampleFiles: SampleFile[] = [],
+  logoFile?: SampleFile | null,
 ): Promise<{
   dataUrl: string;
   model: string;
   usedSamples: number;
+  usedLogo: boolean;
 }> {
   if (!env.OPENAI_API_KEY) {
     throw new AppError('OPENAI_API_KEY is not configured', 503);
@@ -57,9 +59,14 @@ export async function generateMockupImage(
   const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
   try {
-    if (sampleFiles.length > 0) {
+    const referenceFiles = [
+      ...(logoFile ? [logoFile] : []),
+      ...sampleFiles,
+    ].slice(0, 8);
+
+    if (referenceFiles.length > 0) {
       const images = await Promise.all(
-        sampleFiles.slice(0, 8).map(async (sample) => {
+        referenceFiles.map(async (sample) => {
           const buffer =
             sample.buffer || (sample.path ? await readFile(sample.path) : null);
           if (!buffer) {
@@ -84,7 +91,11 @@ export async function generateMockupImage(
       }
 
       const parsed = await extractImageDataUrl(image);
-      return { ...parsed, usedSamples: images.length };
+      return {
+        ...parsed,
+        usedSamples: sampleFiles.length,
+        usedLogo: Boolean(logoFile),
+      };
     }
 
     const result = await openai.images.generate({
@@ -100,7 +111,7 @@ export async function generateMockupImage(
     }
 
     const parsed = await extractImageDataUrl(image);
-    return { ...parsed, usedSamples: 0 };
+    return { ...parsed, usedSamples: 0, usedLogo: false };
   } catch (error) {
     if (error instanceof AppError) throw error;
 

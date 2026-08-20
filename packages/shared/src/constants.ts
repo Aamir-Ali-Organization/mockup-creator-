@@ -27,6 +27,9 @@ export const LOGO_CREATION_OPTIONS = [
   'Not sure yet',
 ] as const;
 
+/** Option that asks AI to invent a new team logo. */
+export const LOGO_CREATE_OPTION = LOGO_CREATION_OPTIONS[0];
+
 /** Option that requires a logo file upload. */
 export const LOGO_ATTACH_OPTION = LOGO_CREATION_OPTIONS[1];
 

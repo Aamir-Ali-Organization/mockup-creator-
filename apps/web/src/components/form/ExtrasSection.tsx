@@ -135,7 +135,7 @@ export function ExtrasSection() {
         <div className="mb-3">
           <h3 className="m-0 font-display text-2xl tracking-wide text-white">Logo</h3>
           <p className="mt-1 text-sm text-white/45">
-            Tell us if you need a logo created or already have one.
+            Already have a logo? Attach a PNG/JPEG. Need one made? Pick create new.
           </p>
         </div>
         <div className="space-y-3">
@@ -156,8 +156,8 @@ export function ExtrasSection() {
                   label="Attach your logo"
                   requiredMark
                   name={field.name}
-                  accept=".png,.jpg,.jpeg,.pdf,.docx"
-                  hint="PNG, JPEG, or PDF preferred"
+                  accept=".png,.jpg,.jpeg,.webp"
+                  hint="PNG, JPEG, or WebP — this exact logo goes on the uniform"
                   value={field.value}
                   onBlur={field.onBlur}
                   onChange={(event) => field.onChange(event.target.files)}

@@ -4,7 +4,12 @@ import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
 import { canGenerateMockups, generateMockupImage } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
-import { createSubmission, updateSubmission } from '@/lib/submission-store';
+import {
+  createSubmission,
+  getSubmission,
+  readSubmissionLogo,
+  updateSubmission,
+} from '@/lib/submission-store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -50,7 +55,6 @@ export async function POST(request: Request) {
     const { job, contactId, fleadid, force } = parsed.data;
     submissionId = parsed.data.submissionId ?? null;
 
-    // One-mockup guard via GHL custom field (unless force).
     if (!force && fleadid && isGhlReady()) {
       const { resolveLeadByFleadid } = await import('@/lib/ghl');
       const existing = await resolveLeadByFleadid(fleadid);
@@ -73,20 +77,40 @@ export async function POST(request: Request) {
       }
     }
 
+    let hasLogoFile = false;
+    let logoForOpenAi: {
+      buffer: Buffer;
+      filename: string;
+      mimeType: string;
+    } | null = null;
+
+    if (submissionId) {
+      try {
+        const existing = await getSubmission(submissionId);
+        hasLogoFile = Boolean(existing.hasLogo);
+        logoForOpenAi = await readSubmissionLogo(submissionId);
+        hasLogoFile = Boolean(logoForOpenAi);
+      } catch {
+        // continue without logo
+      }
+    }
+
     const { prompt, payload, profile, sampleFiles } =
       await buildPromptFromQuoteWithKnowledge({
-      teamName: job.teamName,
-      sport: job.sport,
-      gender: job.gender,
-      ageGroup: job.ageGroup,
-      primaryColor: job.primaryColor,
-      secondaryColor: job.secondaryColor,
-      alternateColor: job.alternateColor,
-      quantity: job.quantity,
-      accessories: job.accessories,
-      logoCreation: job.logoCreation,
-      rosterInfo: job.rosterInfo,
-    });
+        teamName: job.teamName,
+        sport: job.sport,
+        gender: job.gender,
+        ageGroup: job.ageGroup,
+        primaryColor: job.primaryColor,
+        secondaryColor: job.secondaryColor,
+        alternateColor: job.alternateColor,
+        quantity: job.quantity,
+        accessories: job.accessories,
+        logoCreation: job.logoCreation,
+        hasLogoFile,
+        logoFile: hasLogoFile ? 'attached' : null,
+        rosterInfo: job.rosterInfo,
+      });
 
     if (!submissionId) {
       try {
@@ -116,12 +140,12 @@ export async function POST(request: Request) {
     console.info(
       '[mockups/generate] samples',
       sampleFiles.length,
+      'logo',
+      Boolean(logoForOpenAi),
       'sport',
       profile.id,
-      'sampleImagesOnProfile',
-      profile.sampleImages.length,
     );
-    const image = await generateMockupImage(prompt, sampleFiles);
+    const image = await generateMockupImage(prompt, sampleFiles, logoForOpenAi);
 
     if (submissionId) {
       await updateSubmission(submissionId, {
@@ -139,7 +163,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Never fail the mockup response if GHL update breaks — quote + image already succeeded.
     let ghlWarning: string | null = null;
     if (isGhlReady()) {
       try {
@@ -164,6 +187,7 @@ export async function POST(request: Request) {
       payload,
       knowledgeProfileId: profile.id,
       usedSamples: image.usedSamples,
+      usedLogo: image.usedLogo,
       imageDataUrl: image.dataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
       ghlWarning,

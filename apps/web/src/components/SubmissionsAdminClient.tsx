@@ -351,6 +351,7 @@ export function SubmissionsAdminClient() {
                   ['Accent', detail.job.alternateColor || '—'],
                   ['Qty', String(detail.job.quantity)],
                   ['Logo', detail.job.logoCreation || '—'],
+                  ['Logo file saved', detail.hasLogo ? 'Yes' : 'No'],
                   ['Referral', detail.job.referralSource || '—'],
                 ].map(([label, value]) => (
                   <div
