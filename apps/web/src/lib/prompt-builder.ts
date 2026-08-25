@@ -5,6 +5,7 @@ import {
   type AiPromptPayload,
   type KnowledgeProfile,
 } from '@mockup/shared';
+import { buildLogoCreationBriefLine } from '@/lib/logo-brief';
 
 export type QuotePromptInput = {
   teamName: string;
@@ -23,6 +24,15 @@ export type QuotePromptInput = {
   shirtStyle?: string | null;
   shirtType?: string | null;
   shortType?: string | null;
+  logoComposition?: string | null;
+  logoText?: string | null;
+  logoIcon?: string | null;
+  logoColorSource?: string | null;
+  logoPrimaryColor?: string | null;
+  logoSecondaryColor?: string | null;
+  logoAlternateColor?: string | null;
+  logoVibe?: string | null;
+  logoNotes?: string | null;
 };
 
 function resolveLogoMode(quote: QuotePromptInput): {
@@ -55,13 +65,30 @@ export function buildLogoPromptLine(
   }
 
   if (payload.logoCreation === LOGO_CREATE_OPTION) {
+    const brief = buildLogoCreationBriefLine({
+      teamName,
+      sport: payload.team.sport,
+      primaryColor: payload.colors.primary,
+      secondaryColor: payload.colors.secondary,
+      alternateColor: payload.colors.alternate,
+      logoComposition: payload.logoComposition,
+      logoText: payload.logoText,
+      logoIcon: payload.logoIcon,
+      logoColorSource: payload.logoColorSource,
+      logoPrimaryColor: payload.logoPrimaryColor,
+      logoSecondaryColor: payload.logoSecondaryColor,
+      logoAlternateColor: payload.logoAlternateColor,
+      logoVibe: payload.logoVibe,
+      logoNotes: payload.logoNotes,
+    });
     return [
-      `LOGO CREATION REQUESTED: Invent a bold, original Big Mad Drip team logo/mascot for ${teamName}.`,
-      'Make it aggressive, custom, and production-ready (readable at jersey size; works for embroidery/print).',
-      `Use the team colors (${payload.colors.primary} / ${payload.colors.secondary}) in the logo.`,
-      'Place the new logo prominently on the chest as the main graphic — not a plain wordmark-only jersey.',
+      `LOGO CREATION REQUESTED for ${teamName}.`,
+      brief,
+      'Invent a bold original Big Mad Drip logo from that brief and place it prominently on the chest.',
       'Do not copy logos from style reference samples.',
-    ].join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
 
   if (payload.logo) {
@@ -117,6 +144,15 @@ export function buildAiPromptPayload(quote: QuotePromptInput): AiPromptPayload {
     shirtStyle: quote.shirtStyle || '',
     shirtType: quote.shirtType || '',
     shortType: quote.shortType || '',
+    logoComposition: quote.logoComposition || '',
+    logoText: quote.logoText || '',
+    logoIcon: quote.logoIcon || '',
+    logoColorSource: quote.logoColorSource || '',
+    logoPrimaryColor: quote.logoPrimaryColor || '',
+    logoSecondaryColor: quote.logoSecondaryColor || '',
+    logoAlternateColor: quote.logoAlternateColor || '',
+    logoVibe: quote.logoVibe || '',
+    logoNotes: quote.logoNotes || '',
   };
 }
 

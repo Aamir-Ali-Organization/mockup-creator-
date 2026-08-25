@@ -27,6 +27,15 @@ export const submissionJobSchema = z.object({
   shirtStyle: z.string().optional().nullable(),
   shirtType: z.string().optional().nullable(),
   shortType: z.string().optional().nullable(),
+  logoComposition: z.string().optional().nullable(),
+  logoText: z.string().optional().nullable(),
+  logoIcon: z.string().optional().nullable(),
+  logoColorSource: z.string().optional().nullable(),
+  logoPrimaryColor: z.string().optional().nullable(),
+  logoSecondaryColor: z.string().optional().nullable(),
+  logoAlternateColor: z.string().optional().nullable(),
+  logoVibe: z.string().optional().nullable(),
+  logoNotes: z.string().optional().nullable(),
 });
 
 export const submissionRecordSchema = z.object({

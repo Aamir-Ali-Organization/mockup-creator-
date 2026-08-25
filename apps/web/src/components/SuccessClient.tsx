@@ -21,6 +21,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
   const [session, setSession] = useState<MockupSession | null>(null);
   const [phase, setPhase] = useState<Phase>('loading-session');
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
@@ -62,6 +63,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
         }
         if (result.imageDataUrl) {
           setImageDataUrl(result.imageDataUrl);
+          if (result.logoDataUrl) setLogoDataUrl(result.logoDataUrl);
           setPhase('ready');
           return;
         }
@@ -88,6 +90,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
       .then((result) => {
         if (result.imageDataUrl) {
           setImageDataUrl(result.imageDataUrl);
+          if (result.logoDataUrl) setLogoDataUrl(result.logoDataUrl);
           setPhase('ready');
           return;
         }
@@ -165,17 +168,39 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
           {phase === 'ready' && imageDataUrl ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-medium text-accent">
-                Your free mockup is ready — check the drip.
+                Your free {logoDataUrl ? 'logo + mockup are' : 'mockup is'} ready — check the drip.
               </div>
-              <Image
-                src={imageDataUrl}
-                alt={`${job?.teamName || 'Team'} uniform mockup`}
-                width={1024}
-                height={1024}
-                unoptimized
-                className="h-auto w-full rounded-xl border border-white/10"
-                priority
-              />
+              {logoDataUrl ? (
+                <div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">
+                    Free logo
+                  </p>
+                  <Image
+                    src={logoDataUrl}
+                    alt={`${job?.teamName || 'Team'} logo`}
+                    width={512}
+                    height={512}
+                    unoptimized
+                    className="mx-auto h-auto w-full max-w-[320px] rounded-xl border border-white/10 bg-white"
+                  />
+                </div>
+              ) : null}
+              <div>
+                {logoDataUrl ? (
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">
+                    Uniform mockup
+                  </p>
+                ) : null}
+                <Image
+                  src={imageDataUrl}
+                  alt={`${job?.teamName || 'Team'} uniform mockup`}
+                  width={1024}
+                  height={1024}
+                  unoptimized
+                  className="h-auto w-full rounded-xl border border-white/10"
+                  priority
+                />
+              </div>
               <p className="text-sm text-white/55">
                 Preview only — final production art is refined by our design team.
               </p>

@@ -60,6 +60,34 @@ export const LOGO_CREATE_OPTION = LOGO_CREATION_OPTIONS[0];
 /** Option that requires a logo file upload. */
 export const LOGO_ATTACH_OPTION = LOGO_CREATION_OPTIONS[1];
 
+/** Logo design questionnaire (shown when creating a new logo). */
+export const LOGO_COMPOSITION_OPTIONS = [
+  'Wordmark only (text)',
+  'Icon / mascot only',
+  'Word + icon combined',
+  'Badge / shield emblem',
+] as const;
+
+export const LOGO_VIBE_OPTIONS = [
+  'Bold & aggressive',
+  'Clean & modern',
+  'Classic / vintage',
+  'Playful',
+] as const;
+
+export const LOGO_COLOR_SOURCE_OPTIONS = [
+  'Use my team colors',
+  'I want specific logo colors',
+] as const;
+
+export function logoCompositionNeedsIcon(composition: string) {
+  return composition !== 'Wordmark only (text)';
+}
+
+export function logoCompositionNeedsText(composition: string) {
+  return composition !== 'Icon / mascot only';
+}
+
 export const ACCESSORY_GROUPS = [
   {
     title: 'Gear',

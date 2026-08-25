@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  LOGO_PROMPT_PLACEHOLDERS,
   PUBLIC_SPORTS,
   STYLE_COMBO_DEFINITIONS,
   STYLE_FITS,
@@ -78,6 +79,8 @@ function snapshotOf(profile: KnowledgeProfile) {
     instructions: profile.instructions,
     knowledgeBase: profile.knowledgeBase,
     promptTemplate: profile.promptTemplate,
+    logoInstructions: profile.logoInstructions,
+    logoPromptTemplate: profile.logoPromptTemplate,
     enabled: profile.enabled,
     label: profile.label,
     comboSampleSets: profile.comboSampleSets ?? [],
@@ -103,13 +106,15 @@ function relativeTime(iso: string) {
 }
 
 function PlaceholderChips({
+  placeholders,
   onInsert,
 }: {
+  placeholders: readonly string[];
   onInsert: (token: string) => void;
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {KNOWLEDGE_PLACEHOLDERS.map((key) => {
+      {placeholders.map((key) => {
         const token = `{{${key}}}`;
         return (
           <button
@@ -153,6 +158,7 @@ export function KnowledgeAdminClient() {
     mode: 'photo' | 'instructions';
   } | null>(null);
   const templateRef = useRef<HTMLTextAreaElement>(null);
+  const logoTemplateRef = useRef<HTMLTextAreaElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, kind: 'ok' | 'err' = 'ok') => {
@@ -297,6 +303,8 @@ export function KnowledgeAdminClient() {
           instructions: draft.instructions,
           knowledgeBase: draft.knowledgeBase,
           promptTemplate: draft.promptTemplate,
+          logoInstructions: draft.logoInstructions,
+          logoPromptTemplate: draft.logoPromptTemplate,
           enabled: draft.enabled,
           label: draft.label,
           comboSampleSets: draft.comboSampleSets ?? [],
@@ -376,6 +384,26 @@ export function KnowledgeAdminClient() {
     const next =
       draft.promptTemplate.slice(0, start) + token + draft.promptTemplate.slice(end);
     setDraft({ ...draft, promptTemplate: next });
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const insertLogoPlaceholder = (token: string) => {
+    if (!draft) return;
+    const el = logoTemplateRef.current;
+    const current = draft.logoPromptTemplate || '';
+    if (!el || tab !== 'defaults') {
+      setDraft({ ...draft, logoPromptTemplate: `${current}${token}` });
+      setTab('defaults');
+      return;
+    }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? start;
+    const next = current.slice(0, start) + token + current.slice(end);
+    setDraft({ ...draft, logoPromptTemplate: next });
     requestAnimationFrame(() => {
       el.focus();
       const pos = start + token.length;
@@ -1137,7 +1165,10 @@ export function KnowledgeAdminClient() {
                       </p>
                       <div className="space-y-2">
                         <span className="field-label">Insert placeholder</span>
-                        <PlaceholderChips onInsert={insertPlaceholder} />
+                        <PlaceholderChips
+                          placeholders={KNOWLEDGE_PLACEHOLDERS}
+                          onInsert={insertPlaceholder}
+                        />
                       </div>
                       <textarea
                         ref={templateRef}
@@ -1148,6 +1179,52 @@ export function KnowledgeAdminClient() {
                       />
                     </div>
                   </details>
+
+                  <div className="border-t border-white/10 pt-6">
+                    <h3 className="m-0 font-display text-2xl tracking-wide text-white">
+                      Logo
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-white/55">
+                      Logo prompts for this sport when a lead chooses “create a new logo.” Step 1
+                      generates the logo; step 2 puts it on the uniform mockup.
+                    </p>
+                  </div>
+
+                  <label className="block space-y-2">
+                    <span className="field-label">Logo rules (always applied)</span>
+                    <textarea
+                      className="input-field min-h-[140px] resize-y text-sm leading-relaxed"
+                      value={draft.logoInstructions || ''}
+                      onChange={(e) =>
+                        setDraft({ ...draft, logoInstructions: e.target.value })
+                      }
+                      placeholder="Output ONLY the logo on a clean white background…"
+                    />
+                  </label>
+
+                  <label className="block space-y-2">
+                    <span className="field-label">Logo prompt template</span>
+                    <div className="space-y-2">
+                      <span className="text-xs text-white/40">Insert placeholder</span>
+                      <PlaceholderChips
+                        placeholders={LOGO_PROMPT_PLACEHOLDERS}
+                        onInsert={insertLogoPlaceholder}
+                      />
+                    </div>
+                    <textarea
+                      ref={logoTemplateRef}
+                      className="input-field min-h-[240px] resize-y font-mono text-[13px] leading-relaxed"
+                      value={draft.logoPromptTemplate || ''}
+                      onChange={(e) =>
+                        setDraft({ ...draft, logoPromptTemplate: e.target.value })
+                      }
+                      placeholder="Create a single premium sports team logo for {{teamName}}…"
+                    />
+                    <p className="m-0 text-xs text-white/40">
+                      Use {'{{textSentence}}'}, {'{{iconSentence}}'}, and {'{{notesSentence}}'} for
+                      optional lines that auto-hide when empty.
+                    </p>
+                  </label>
                 </div>
               )}
             </div>

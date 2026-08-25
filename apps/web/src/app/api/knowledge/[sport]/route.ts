@@ -10,6 +10,8 @@ const patchSchema = z.object({
   instructions: z.string().optional(),
   knowledgeBase: z.string().optional(),
   promptTemplate: z.string().optional(),
+  logoInstructions: z.string().optional(),
+  logoPromptTemplate: z.string().optional(),
   enabled: z.boolean().optional(),
   label: z.string().optional(),
   comboSampleSets: z.array(knowledgeComboSampleSetSchema).optional(),

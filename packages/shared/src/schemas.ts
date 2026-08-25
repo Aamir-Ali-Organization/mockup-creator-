@@ -4,7 +4,11 @@ import {
   AGE_GROUPS,
   GENDERS,
   LOGO_ATTACH_OPTION,
+  LOGO_COLOR_SOURCE_OPTIONS,
+  LOGO_COMPOSITION_OPTIONS,
+  LOGO_CREATE_OPTION,
   LOGO_CREATION_OPTIONS,
+  LOGO_VIBE_OPTIONS,
   MIN_UNIFORM_QUANTITY,
   PUBLIC_SPORTS,
   QUOTE_STATUSES,
@@ -13,6 +17,8 @@ import {
   SHIRT_TYPES,
   SHORT_TYPES,
   genderLocksAdult,
+  logoCompositionNeedsIcon,
+  logoCompositionNeedsText,
   sportNeedsGarmentDetails,
 } from './constants.js';
 
@@ -108,6 +114,15 @@ export const quoteFormSchema = z
     rosterFile: z.any().optional(),
     logoCreation: z.union([z.enum(LOGO_CREATION_OPTIONS), z.literal('')]).optional(),
     logoFile: z.any().optional(),
+    logoComposition: optionalSelect(LOGO_COMPOSITION_OPTIONS),
+    logoText: z.string().trim().optional().default(''),
+    logoIcon: z.string().trim().optional().default(''),
+    logoColorSource: optionalSelect(LOGO_COLOR_SOURCE_OPTIONS),
+    logoPrimaryColor: z.string().trim().optional().default(''),
+    logoSecondaryColor: z.string().trim().optional().default(''),
+    logoAlternateColor: z.string().trim().optional().default(''),
+    logoVibe: optionalSelect(LOGO_VIBE_OPTIONS),
+    logoNotes: z.string().trim().optional().default(''),
     referralSource: requiredSelect(REFERRAL_SOURCES, 'Tell us how you heard about us'),
     consent: z.literal(true, {
       errorMap: () => ({ message: 'Consent is required to submit' }),
@@ -120,6 +135,64 @@ export const quoteFormSchema = z
         message: 'Attach your logo file',
         path: ['logoFile'],
       });
+    }
+
+    if (data.logoCreation === LOGO_CREATE_OPTION) {
+      if (!data.logoComposition) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a logo type',
+          path: ['logoComposition'],
+        });
+      }
+      if (!data.logoVibe) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a logo style',
+          path: ['logoVibe'],
+        });
+      }
+      if (!data.logoColorSource) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select logo colors',
+          path: ['logoColorSource'],
+        });
+      }
+      if (data.logoColorSource === 'I want specific logo colors') {
+        if (!data.logoPrimaryColor?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Pick a primary logo color',
+            path: ['logoPrimaryColor'],
+          });
+        }
+        if (!data.logoSecondaryColor?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Pick a secondary logo color',
+            path: ['logoSecondaryColor'],
+          });
+        }
+      }
+      if (data.logoComposition && logoCompositionNeedsText(data.logoComposition)) {
+        if (!data.logoText?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'What text should appear on the logo?',
+            path: ['logoText'],
+          });
+        }
+      }
+      if (data.logoComposition && logoCompositionNeedsIcon(data.logoComposition)) {
+        if (!data.logoIcon?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Describe the icon or mascot',
+            path: ['logoIcon'],
+          });
+        }
+      }
     }
 
     if (genderLocksAdult(data.gender) && data.ageGroup !== 'Adult') {
@@ -174,6 +247,15 @@ export const createQuoteBodySchema = z
     accessories: z.array(z.string()).default([]),
     rosterInfo: z.string().trim().optional().default(''),
     logoCreation: z.string().optional().nullable(),
+    logoComposition: z.string().optional().nullable().default(''),
+    logoText: z.string().optional().nullable().default(''),
+    logoIcon: z.string().optional().nullable().default(''),
+    logoColorSource: z.string().optional().nullable().default(''),
+    logoPrimaryColor: z.string().optional().nullable().default(''),
+    logoSecondaryColor: z.string().optional().nullable().default(''),
+    logoAlternateColor: z.string().optional().nullable().default(''),
+    logoVibe: z.string().optional().nullable().default(''),
+    logoNotes: z.string().optional().nullable().default(''),
     referralSource: z.enum(REFERRAL_SOURCES),
     rosterFile: z.string().optional().nullable(),
     logoFile: z.string().optional().nullable(),
@@ -208,6 +290,69 @@ export const createQuoteBodySchema = z
           code: z.ZodIssueCode.custom,
           message: 'Select a short type',
           path: ['shortType'],
+        });
+      }
+    }
+    if (data.logoCreation === LOGO_CREATE_OPTION) {
+      if (!(LOGO_COMPOSITION_OPTIONS as readonly string[]).includes(data.logoComposition || '')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a logo type',
+          path: ['logoComposition'],
+        });
+      }
+      if (!(LOGO_VIBE_OPTIONS as readonly string[]).includes(data.logoVibe || '')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a logo style',
+          path: ['logoVibe'],
+        });
+      }
+      if (
+        !(LOGO_COLOR_SOURCE_OPTIONS as readonly string[]).includes(data.logoColorSource || '')
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select logo colors',
+          path: ['logoColorSource'],
+        });
+      }
+      if (data.logoColorSource === 'I want specific logo colors') {
+        if (!String(data.logoPrimaryColor || '').trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Pick a primary logo color',
+            path: ['logoPrimaryColor'],
+          });
+        }
+        if (!String(data.logoSecondaryColor || '').trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Pick a secondary logo color',
+            path: ['logoSecondaryColor'],
+          });
+        }
+      }
+      if (
+        data.logoComposition &&
+        logoCompositionNeedsText(data.logoComposition) &&
+        !String(data.logoText || '').trim()
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'What text should appear on the logo?',
+          path: ['logoText'],
+        });
+      }
+      if (
+        data.logoComposition &&
+        logoCompositionNeedsIcon(data.logoComposition) &&
+        !String(data.logoIcon || '').trim()
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Describe the icon or mascot',
+          path: ['logoIcon'],
         });
       }
     }
@@ -258,13 +403,21 @@ export const aiPromptPayloadSchema = z.object({
   quantity: z.number(),
   accessories: z.array(z.string()),
   logo: z.boolean(),
-  logoCreation: z.string().optional(),
-  /** True when a customer logo file was stored and will be sent to OpenAI. */
+  logoCreation: z.string().optional().nullable(),
   hasLogoFile: z.boolean().optional().default(false),
   rosterInfo: z.string().optional(),
   shirtStyle: z.string().optional().default(''),
   shirtType: z.string().optional().default(''),
   shortType: z.string().optional().default(''),
+  logoComposition: z.string().optional().default(''),
+  logoText: z.string().optional().default(''),
+  logoIcon: z.string().optional().default(''),
+  logoColorSource: z.string().optional().default(''),
+  logoPrimaryColor: z.string().optional().default(''),
+  logoSecondaryColor: z.string().optional().default(''),
+  logoAlternateColor: z.string().optional().default(''),
+  logoVibe: z.string().optional().default(''),
+  logoNotes: z.string().optional().default(''),
 });
 
 export type AiPromptPayload = z.infer<typeof aiPromptPayloadSchema>;

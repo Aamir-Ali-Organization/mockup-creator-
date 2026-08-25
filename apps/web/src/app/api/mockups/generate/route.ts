@@ -1,18 +1,26 @@
 import { z } from 'zod';
+import { LOGO_CREATE_OPTION } from '@mockup/shared';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
-import { canGenerateMockups, generateMockupImage } from '@/lib/openai';
+import { buildStandaloneLogoPrompt } from '@/lib/logo-brief';
+import {
+  canGenerateMockups,
+  generateLogoImage,
+  generateMockupImage,
+} from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
+import { getKnowledgeProfile } from '@/lib/knowledge-store';
 import {
   createSubmission,
   getSubmission,
   readSubmissionLogo,
+  saveSubmissionLogo,
   updateSubmission,
 } from '@/lib/submission-store';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const bodySchema = z.object({
   contactId: z.string().optional().nullable(),
@@ -37,9 +45,29 @@ const bodySchema = z.object({
     shirtType: z.string().optional().nullable(),
     shortType: z.string().optional().nullable(),
     logoCreation: z.string().optional().nullable(),
+    logoComposition: z.string().optional().nullable(),
+    logoText: z.string().optional().nullable(),
+    logoIcon: z.string().optional().nullable(),
+    logoColorSource: z.string().optional().nullable(),
+    logoPrimaryColor: z.string().optional().nullable(),
+    logoSecondaryColor: z.string().optional().nullable(),
+    logoAlternateColor: z.string().optional().nullable(),
+    logoVibe: z.string().optional().nullable(),
+    logoNotes: z.string().optional().nullable(),
     referralSource: z.string(),
   }),
 });
+
+function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl);
+  if (!match) {
+    throw new AppError('Invalid generated logo data URL', 500);
+  }
+  return {
+    mimeType: match[1],
+    buffer: Buffer.from(match[2], 'base64'),
+  };
+}
 
 export async function POST(request: Request) {
   let submissionId: string | null = null;
@@ -86,6 +114,8 @@ export async function POST(request: Request) {
       filename: string;
       mimeType: string;
     } | null = null;
+    let logoDataUrl: string | undefined;
+    let logoPrompt: string | null = null;
 
     if (submissionId) {
       try {
@@ -98,6 +128,58 @@ export async function POST(request: Request) {
       }
     }
 
+    const wantsCreatedLogo =
+      job.logoCreation === LOGO_CREATE_OPTION && !hasLogoFile;
+
+    // Step 1 — create logo from the questionnaire when needed.
+    if (wantsCreatedLogo) {
+      const sportProfile = await getKnowledgeProfile(job.sport);
+      logoPrompt = buildStandaloneLogoPrompt(
+        {
+          teamName: job.teamName,
+          sport: job.sport,
+          primaryColor: job.primaryColor,
+          secondaryColor: job.secondaryColor,
+          alternateColor: job.alternateColor,
+          logoComposition: job.logoComposition,
+          logoText: job.logoText,
+          logoIcon: job.logoIcon,
+          logoColorSource: job.logoColorSource,
+          logoPrimaryColor: job.logoPrimaryColor,
+          logoSecondaryColor: job.logoSecondaryColor,
+          logoAlternateColor: job.logoAlternateColor,
+          logoVibe: job.logoVibe,
+          logoNotes: job.logoNotes,
+        },
+        {
+          instructions: sportProfile.logoInstructions,
+          promptTemplate: sportProfile.logoPromptTemplate,
+        },
+      );
+
+      console.info('[mockups/generate] step1 logo for', job.teamName, job.sport);
+      const logoImage = await generateLogoImage(logoPrompt);
+      logoDataUrl = logoImage.dataUrl;
+      const parsedLogo = dataUrlToBuffer(logoImage.dataUrl);
+      logoForOpenAi = {
+        buffer: parsedLogo.buffer,
+        filename: 'generated-logo.png',
+        mimeType: parsedLogo.mimeType,
+      };
+      hasLogoFile = true;
+
+      if (submissionId) {
+        await saveSubmissionLogo(submissionId, {
+          buffer: parsedLogo.buffer,
+          filename: 'generated-logo.png',
+          mimeType: parsedLogo.mimeType,
+        }).catch((error) => {
+          console.error('[mockups/generate] failed to persist generated logo:', error);
+        });
+      }
+    }
+
+    // Step 2 — uniform mockup (uses logo file when available).
     const { prompt, payload, profile, sampleFiles, comboId } =
       await buildPromptFromQuoteWithKnowledge({
         teamName: job.teamName,
@@ -116,6 +198,15 @@ export async function POST(request: Request) {
         shirtStyle: job.shirtStyle || '',
         shirtType: job.shirtType || '',
         shortType: job.shortType || '',
+        logoComposition: job.logoComposition || '',
+        logoText: job.logoText || '',
+        logoIcon: job.logoIcon || '',
+        logoColorSource: job.logoColorSource || '',
+        logoPrimaryColor: job.logoPrimaryColor || '',
+        logoSecondaryColor: job.logoSecondaryColor || '',
+        logoAlternateColor: job.logoAlternateColor || '',
+        logoVibe: job.logoVibe || '',
+        logoNotes: job.logoNotes || '',
       });
 
     if (!submissionId) {
@@ -129,6 +220,9 @@ export async function POST(request: Request) {
           knowledgeProfileId: profile.id,
         });
         submissionId = created.id;
+        if (logoForOpenAi && wantsCreatedLogo) {
+          await saveSubmissionLogo(submissionId, logoForOpenAi).catch(() => undefined);
+        }
       } catch (logError) {
         console.error('[mockups/generate] failed to create submission log:', logError);
       }
@@ -144,7 +238,7 @@ export async function POST(request: Request) {
     }
 
     console.info(
-      '[mockups/generate] samples',
+      '[mockups/generate] step2 mockup samples',
       sampleFiles.length,
       'combo',
       comboId,
@@ -158,7 +252,7 @@ export async function POST(request: Request) {
     if (submissionId) {
       await updateSubmission(submissionId, {
         status: 'ready',
-        prompt,
+        prompt: logoPrompt ? `LOGO PROMPT:\n${logoPrompt}\n\nMOCKUP PROMPT:\n${prompt}` : prompt,
         payload,
         model: image.model,
         usedSamples: image.usedSamples,
@@ -192,11 +286,13 @@ export async function POST(request: Request) {
       submissionId,
       model: image.model,
       prompt,
+      logoPrompt,
       payload,
       knowledgeProfileId: profile.id,
       usedSamples: image.usedSamples,
       usedLogo: image.usedLogo,
       imageDataUrl: image.dataUrl,
+      logoDataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
       ghlWarning,
     });

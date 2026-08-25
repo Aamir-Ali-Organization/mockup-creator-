@@ -42,6 +42,53 @@ function extractImageDataUrl(image: {
   })();
 }
 
+export async function generateLogoImage(prompt: string): Promise<{
+  dataUrl: string;
+  model: string;
+}> {
+  if (!env.OPENAI_API_KEY) {
+    throw new AppError('OPENAI_API_KEY is not configured', 503);
+  }
+
+  const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+
+  try {
+    const result = await openai.images.generate({
+      model: env.OPENAI_IMAGE_MODEL,
+      prompt,
+      n: 1,
+      size: env.OPENAI_IMAGE_SIZE as '1024x1024',
+    });
+
+    const image = result.data?.[0];
+    if (!image) {
+      throw new AppError('OpenAI returned no logo image data', 502);
+    }
+
+    return extractImageDataUrl(image);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+
+    const apiError = error as {
+      message?: unknown;
+      status?: unknown;
+      error?: { message?: unknown };
+    };
+    const detail =
+      (typeof apiError.error?.message === 'string' && apiError.error.message) ||
+      (typeof apiError.message === 'string' && apiError.message) ||
+      'OpenAI logo generation failed';
+    const status = typeof apiError.status === 'number' ? apiError.status : 502;
+
+    throw new AppError(
+      detail === 'Unprocessable Entity'
+        ? 'OpenAI could not create this logo. Try simplifying the logo details.'
+        : detail,
+      status >= 400 && status < 600 ? status : 502,
+    );
+  }
+}
+
 export async function generateMockupImage(
   prompt: string,
   sampleFiles: SampleFile[] = [],

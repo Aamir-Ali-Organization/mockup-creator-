@@ -354,6 +354,21 @@ export function SubmissionsAdminClient() {
                   ['Accent', detail.job.alternateColor || '—'],
                   ['Qty', String(detail.job.quantity)],
                   ['Logo', detail.job.logoCreation || '—'],
+                  ['Logo type', detail.job.logoComposition || '—'],
+                  ['Logo text', detail.job.logoText || '—'],
+                  ['Logo icon', detail.job.logoIcon || '—'],
+                  [
+                    'Logo colors',
+                    detail.job.logoColorSource === 'I want specific logo colors'
+                      ? [
+                          detail.job.logoPrimaryColor,
+                          detail.job.logoSecondaryColor,
+                          detail.job.logoAlternateColor,
+                        ]
+                          .filter(Boolean)
+                          .join(' / ') || '—'
+                      : detail.job.logoColorSource || '—',
+                  ],
                   ['Logo file saved', detail.hasLogo ? 'Yes' : 'No'],
                   ['Referral', detail.job.referralSource || '—'],
                 ].map(([label, value]) => (

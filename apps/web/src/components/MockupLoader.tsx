@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 
 const MESSAGES = [
+  'Reading your logo brief…',
+  'Designing your free team logo…',
   'Locking in your team colors…',
-  'Cutting the jersey silhouette…',
-  'Dropping the logo placement…',
+  'Building the uniform mockup…',
+  'Placing the logo on the jersey…',
   'Adding that Big Mad Drip finish…',
-  'Rendering your free preview…',
   'Almost there — polishing the look…',
 ] as const;
 

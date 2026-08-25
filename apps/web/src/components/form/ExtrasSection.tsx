@@ -6,32 +6,93 @@ import {
   ACCESSORIES,
   ACCESSORY_GROUPS,
   LOGO_ATTACH_OPTION,
+  LOGO_COLOR_SOURCE_OPTIONS,
+  LOGO_COMPOSITION_OPTIONS,
+  LOGO_CREATE_OPTION,
   LOGO_CREATION_OPTIONS,
+  LOGO_VIBE_OPTIONS,
+  logoCompositionNeedsIcon,
+  logoCompositionNeedsText,
 } from '@mockup/shared';
 import { SelectField } from '@/components/ui/SelectField';
 import { TextAreaField } from '@/components/ui/TextAreaField';
+import { TextField } from '@/components/ui/TextField';
 import { FileField } from '@/components/ui/FileField';
+import { ColorField } from '@/components/ui/ColorField';
+import { colorPreviewHex } from '@/lib/colors';
 
 type Accessory = (typeof ACCESSORIES)[number];
+
+function isLightHex(hex: string): boolean {
+  const expanded = hex.replace('#', '');
+  if (expanded.length !== 6) return false;
+  const r = Number.parseInt(expanded.slice(0, 2), 16);
+  const g = Number.parseInt(expanded.slice(2, 4), 16);
+  const b = Number.parseInt(expanded.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 170;
+}
+
+const LOGO_COLOR_SLOTS = [
+  { key: 'logoPrimaryColor', short: 'Primary', watch: 'primary' as const, required: true },
+  { key: 'logoSecondaryColor', short: 'Secondary', watch: 'secondary' as const, required: true },
+  { key: 'logoAlternateColor', short: 'Alternate', watch: 'alternate' as const, required: false },
+] as const;
 
 export function ExtrasSection() {
   const {
     control,
     register,
     setValue,
+    getValues,
     formState: { errors },
   } = useFormContext();
 
   const [accessoriesOpen, setAccessoriesOpen] = useState(false);
   const accessories = (useWatch({ control, name: 'accessories' }) || []) as Accessory[];
   const logoCreation = (useWatch({ control, name: 'logoCreation' }) || '') as string;
+  const logoComposition = (useWatch({ control, name: 'logoComposition' }) || '') as string;
+  const logoColorSource = (useWatch({ control, name: 'logoColorSource' }) || '') as string;
+  const teamName = (useWatch({ control, name: 'teamName' }) || '') as string;
+  const logoPrimaryColor = (useWatch({ control, name: 'logoPrimaryColor' }) || '') as string;
+  const logoSecondaryColor = (useWatch({ control, name: 'logoSecondaryColor' }) || '') as string;
+  const logoAlternateColor = (useWatch({ control, name: 'logoAlternateColor' }) || '') as string;
   const needsLogoUpload = logoCreation === LOGO_ATTACH_OPTION;
+  const needsLogoBrief = logoCreation === LOGO_CREATE_OPTION;
+  const showLogoText =
+    needsLogoBrief && Boolean(logoComposition) && logoCompositionNeedsText(logoComposition);
+  const showLogoIcon =
+    needsLogoBrief && Boolean(logoComposition) && logoCompositionNeedsIcon(logoComposition);
+  const showCustomColors = needsLogoBrief && logoColorSource === 'I want specific logo colors';
+  const logoColorValues = {
+    primary: logoPrimaryColor,
+    secondary: logoSecondaryColor,
+    alternate: logoAlternateColor,
+  };
 
   useEffect(() => {
     if (!needsLogoUpload) {
       setValue('logoFile', undefined, { shouldValidate: true });
     }
   }, [needsLogoUpload, setValue]);
+
+  useEffect(() => {
+    if (!needsLogoBrief) {
+      setValue('logoComposition', '', { shouldValidate: false });
+      setValue('logoText', '', { shouldValidate: false });
+      setValue('logoIcon', '', { shouldValidate: false });
+      setValue('logoColorSource', '', { shouldValidate: false });
+      setValue('logoPrimaryColor', '', { shouldValidate: false });
+      setValue('logoSecondaryColor', '', { shouldValidate: false });
+      setValue('logoAlternateColor', '', { shouldValidate: false });
+      setValue('logoVibe', '', { shouldValidate: false });
+      setValue('logoNotes', '', { shouldValidate: false });
+      return;
+    }
+    const currentText = String(getValues('logoText') || '').trim();
+    if (!currentText && teamName) {
+      setValue('logoText', teamName, { shouldValidate: false, shouldDirty: false });
+    }
+  }, [needsLogoBrief, teamName, getValues, setValue]);
 
   useEffect(() => {
     if (!accessoriesOpen) return;
@@ -166,6 +227,175 @@ export function ExtrasSection() {
                 />
               )}
             />
+          ) : null}
+
+          {needsLogoBrief ? (
+            <div className="space-y-3 rounded-xl border border-accent/25 bg-accent/[0.06] p-3 sm:p-4">
+              <div>
+                <p className="m-0 text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
+                  Free logo design
+                </p>
+                <p className="mt-1 text-sm text-white/55">
+                  Answer a few questions — we create your logo first, then put it on the mockup.
+                </p>
+              </div>
+
+              <SelectField
+                label="Logo type"
+                requiredMark
+                placeholder="Select logo type"
+                options={LOGO_COMPOSITION_OPTIONS}
+                error={errors.logoComposition?.message as string | undefined}
+                {...register('logoComposition')}
+              />
+
+              {showLogoText ? (
+                <TextField
+                  label="What text goes on the logo?"
+                  requiredMark
+                  placeholder={teamName || 'Team name'}
+                  hint="Usually the team name"
+                  error={errors.logoText?.message as string | undefined}
+                  {...register('logoText')}
+                />
+              ) : null}
+
+              {showLogoIcon ? (
+                <TextField
+                  label="What icon or mascot?"
+                  requiredMark
+                  placeholder="e.g. roaring cheetah, lightning bolt, bull skull"
+                  error={errors.logoIcon?.message as string | undefined}
+                  {...register('logoIcon')}
+                />
+              ) : null}
+
+              <SelectField
+                label="Logo style"
+                requiredMark
+                placeholder="Select style"
+                options={LOGO_VIBE_OPTIONS}
+                error={errors.logoVibe?.message as string | undefined}
+                {...register('logoVibe')}
+              />
+
+              <SelectField
+                label="Logo colors"
+                requiredMark
+                placeholder="Select colors"
+                options={LOGO_COLOR_SOURCE_OPTIONS}
+                error={errors.logoColorSource?.message as string | undefined}
+                {...register('logoColorSource')}
+              />
+
+              {showCustomColors ? (
+                <div className="space-y-3">
+                  <p className="m-0 text-sm text-white/55">
+                    Pick the colors for the logo — same style as team colors.
+                  </p>
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+                    <div className="flex min-h-[4.5rem]">
+                      {LOGO_COLOR_SLOTS.map((slot) => {
+                        const raw = logoColorValues[slot.watch];
+                        const filled = Boolean(raw.trim());
+                        const hex = filled ? colorPreviewHex(raw) : null;
+                        const light = hex ? isLightHex(hex) : false;
+
+                        return (
+                          <div
+                            key={slot.key}
+                            className="relative flex min-w-0 flex-1 flex-col justify-between border-r border-white/10 px-2.5 py-2.5 last:border-r-0"
+                            style={{
+                              backgroundColor: hex || 'transparent',
+                              backgroundImage: hex
+                                ? undefined
+                                : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
+                            }}
+                          >
+                            <span
+                              className={`w-fit rounded px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] ${
+                                hex
+                                  ? light
+                                    ? 'bg-black/45 text-white'
+                                    : 'bg-white/90 text-ink'
+                                  : 'bg-white/10 text-white/55'
+                              }`}
+                            >
+                              {slot.short}
+                            </span>
+                            <span
+                              className={`truncate text-sm font-semibold ${
+                                hex ? (light ? 'text-ink' : 'text-white') : 'text-white/35'
+                              }`}
+                            >
+                              {filled ? raw : 'Not set'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Controller
+                      name="logoPrimaryColor"
+                      control={control}
+                      render={({ field }) => (
+                        <ColorField
+                          label="Logo primary"
+                          requiredMark
+                          name={field.name}
+                          value={field.value || ''}
+                          onBlur={field.onBlur}
+                          onChange={field.onChange}
+                          error={errors.logoPrimaryColor?.message as string | undefined}
+                          ref={field.ref}
+                        />
+                      )}
+                    />
+                    <Controller
+                      name="logoSecondaryColor"
+                      control={control}
+                      render={({ field }) => (
+                        <ColorField
+                          label="Logo secondary"
+                          requiredMark
+                          name={field.name}
+                          value={field.value || ''}
+                          onBlur={field.onBlur}
+                          onChange={field.onChange}
+                          error={errors.logoSecondaryColor?.message as string | undefined}
+                          ref={field.ref}
+                        />
+                      )}
+                    />
+                    <Controller
+                      name="logoAlternateColor"
+                      control={control}
+                      render={({ field }) => (
+                        <ColorField
+                          className="sm:col-span-2"
+                          label="Logo alternate"
+                          optional
+                          name={field.name}
+                          value={field.value || ''}
+                          onBlur={field.onBlur}
+                          onChange={field.onChange}
+                          error={errors.logoAlternateColor?.message as string | undefined}
+                          ref={field.ref}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <TextAreaField
+                label="Anything else for the logo? (optional)"
+                placeholder="Must include a #23, no script font, aggressive eyes…"
+                {...register('logoNotes')}
+              />
+            </div>
           ) : null}
         </div>
       </section>

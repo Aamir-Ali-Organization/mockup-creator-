@@ -273,6 +273,8 @@ export async function saveKnowledgeProfile(
       | 'instructions'
       | 'knowledgeBase'
       | 'promptTemplate'
+      | 'logoInstructions'
+      | 'logoPromptTemplate'
       | 'enabled'
       | 'label'
       | 'sampleImages'

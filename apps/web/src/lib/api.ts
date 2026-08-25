@@ -37,6 +37,15 @@ export type MockupJob = {
   accessories: string[];
   rosterInfo?: string | null;
   logoCreation?: string | null;
+  logoComposition?: string | null;
+  logoText?: string | null;
+  logoIcon?: string | null;
+  logoColorSource?: string | null;
+  logoPrimaryColor?: string | null;
+  logoSecondaryColor?: string | null;
+  logoAlternateColor?: string | null;
+  logoVibe?: string | null;
+  logoNotes?: string | null;
   referralSource: string;
 };
 
@@ -58,6 +67,7 @@ export type GenerateResult = {
   fleadid?: string | null;
   submissionId?: string | null;
   imageDataUrl?: string;
+  logoDataUrl?: string;
   model?: string;
 };
 
@@ -119,6 +129,15 @@ export async function submitQuote(values: CreateQuotePayload): Promise<SubmitRes
   formData.append('shortType', values.shortType || '');
   formData.append('rosterInfo', values.rosterInfo || '');
   formData.append('logoCreation', values.logoCreation || '');
+  formData.append('logoComposition', values.logoComposition || '');
+  formData.append('logoText', values.logoText || '');
+  formData.append('logoIcon', values.logoIcon || '');
+  formData.append('logoColorSource', values.logoColorSource || '');
+  formData.append('logoPrimaryColor', values.logoPrimaryColor || '');
+  formData.append('logoSecondaryColor', values.logoSecondaryColor || '');
+  formData.append('logoAlternateColor', values.logoAlternateColor || '');
+  formData.append('logoVibe', values.logoVibe || '');
+  formData.append('logoNotes', values.logoNotes || '');
   formData.append('referralSource', values.referralSource);
 
   values.accessories.forEach((item) => formData.append('accessories', item));

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { SPORTS } from './constants.js';
+import {
+  DEFAULT_LOGO_INSTRUCTIONS,
+  DEFAULT_LOGO_PROMPT_TEMPLATE,
+} from './logo-knowledge.js';
 
 export const knowledgeSampleSchema = z.object({
   id: z.string(),
@@ -38,6 +42,17 @@ export const knowledgeProfileSchema = z.object({
    * {{quantity}} {{accessories}} {{logoLine}} {{garmentLine}} {{rosterInfo}}
    */
   promptTemplate: z.string(),
+  /**
+   * Logo image generation rules for this sport (step 1 when creating a logo).
+   * Always prepended to the filled logo prompt template.
+   */
+  logoInstructions: z.string().default(DEFAULT_LOGO_INSTRUCTIONS),
+  /**
+   * Logo image prompt template for this sport.
+   * Placeholders: {{teamName}} {{sport}} {{composition}} {{vibe}} {{text}} {{icon}}
+   * {{colors}} {{logoNotes}} {{textSentence}} {{iconSentence}} {{notesSentence}} …
+   */
+  logoPromptTemplate: z.string().default(DEFAULT_LOGO_PROMPT_TEMPLATE),
   /** General / fallback samples for this sport. */
   sampleImages: z.array(knowledgeSampleSchema).default([]),
   /**
@@ -258,6 +273,8 @@ export function createDefaultKnowledgeProfile(sport: string): KnowledgeProfile {
     instructions: DEFAULT_INSTRUCTIONS,
     knowledgeBase: DEFAULT_KNOWLEDGE,
     promptTemplate: SPORT_TEMPLATES[sport] ?? MASTER_TEMPLATE,
+    logoInstructions: DEFAULT_LOGO_INSTRUCTIONS,
+    logoPromptTemplate: DEFAULT_LOGO_PROMPT_TEMPLATE,
     sampleImages: [],
     comboSampleSets: [],
     updatedAt: now,
