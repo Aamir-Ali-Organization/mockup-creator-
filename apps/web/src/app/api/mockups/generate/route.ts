@@ -14,6 +14,7 @@ import { getKnowledgeProfile, collectLogoReferenceSamples } from '@/lib/knowledg
 import {
   createSubmission,
   getSubmission,
+  readSubmissionImage,
   readSubmissionLogo,
   saveSubmissionLogo,
   updateSubmission,
@@ -69,14 +70,51 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } 
   };
 }
 
+function bufferToDataUrl(buffer: Buffer, mimeType: string): string {
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
+
+async function loadCachedMockupResult(submissionId: string): Promise<{
+  imageDataUrl: string;
+  logoDataUrl?: string;
+} | null> {
+  try {
+    const existing = await getSubmission(submissionId);
+    if (!existing.hasImage) return null;
+
+    const image = await readSubmissionImage(submissionId);
+    if (!image) return null;
+
+    let imageDataUrl: string | null = null;
+    if (image.redirectUrl) {
+      const response = await fetch(image.redirectUrl);
+      if (!response.ok) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get('content-type') || image.contentType || 'image/png';
+      imageDataUrl = bufferToDataUrl(bytes, contentType);
+    } else if (image.buffer.length > 0) {
+      imageDataUrl = bufferToDataUrl(image.buffer, image.contentType || 'image/png');
+    }
+    if (!imageDataUrl) return null;
+
+    let logoDataUrl: string | undefined;
+    if (existing.hasLogo) {
+      const logo = await readSubmissionLogo(submissionId);
+      if (logo) {
+        logoDataUrl = bufferToDataUrl(logo.buffer, logo.mimeType || 'image/png');
+      }
+    }
+
+    return { imageDataUrl, logoDataUrl };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   let submissionId: string | null = null;
 
   try {
-    if (!canGenerateMockups()) {
-      throw new AppError('OPENAI_API_KEY is not configured', 503);
-    }
-
     const json = await request.json();
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) {
@@ -86,11 +124,49 @@ export async function POST(request: Request) {
     const { job, contactId, fleadid, force } = parsed.data;
     submissionId = parsed.data.submissionId ?? null;
 
+    // Refresh / revisit: return the already-saved free mockup instead of regenerating.
+    if (!force && submissionId) {
+      const cached = await loadCachedMockupResult(submissionId);
+      if (cached) {
+        console.info('[mockups/generate] returning cached mockup', submissionId);
+        return Response.json({
+          success: true,
+          skipped: false,
+          alreadyGenerated: true,
+          message: 'Returning your existing free mockup',
+          contactId,
+          fleadid,
+          submissionId,
+          imageDataUrl: cached.imageDataUrl,
+          logoDataUrl: cached.logoDataUrl,
+        });
+      }
+    }
+
     if (!force && fleadid && isGhlReady()) {
       const { resolveLeadByFleadid } = await import('@/lib/ghl');
       const existing = await resolveLeadByFleadid(fleadid);
       if (existing.mockupAlreadyGenerated) {
         if (submissionId) {
+          const cached = await loadCachedMockupResult(submissionId);
+          if (cached) {
+            console.info(
+              '[mockups/generate] GHL already generated — returning cached',
+              submissionId,
+            );
+            return Response.json({
+              success: true,
+              skipped: false,
+              alreadyGenerated: true,
+              message: 'Returning your existing free mockup',
+              contactId: existing.contactId || contactId,
+              fleadid,
+              submissionId,
+              imageDataUrl: cached.imageDataUrl,
+              logoDataUrl: cached.logoDataUrl,
+            });
+          }
+
           await updateSubmission(submissionId, {
             status: 'skipped',
             skipMockup: true,
@@ -106,6 +182,10 @@ export async function POST(request: Request) {
           imageDataUrl: undefined,
         });
       }
+    }
+
+    if (!canGenerateMockups()) {
+      throw new AppError('OPENAI_API_KEY is not configured', 503);
     }
 
     let hasLogoFile = false;

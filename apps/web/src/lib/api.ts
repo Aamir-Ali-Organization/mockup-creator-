@@ -62,6 +62,7 @@ export type SubmitResult = {
 export type GenerateResult = {
   success: boolean;
   skipped: boolean;
+  alreadyGenerated?: boolean;
   message?: string;
   contactId?: string | null;
   fleadid?: string | null;
@@ -79,6 +80,8 @@ export type MockupSession = {
   submissionId?: string | null;
   skipMockup: boolean;
   shouldGenerate: boolean;
+  /** True after the free mockup finished (used to avoid regenerating on refresh). */
+  hasGenerated?: boolean;
   job: MockupJob;
 };
 

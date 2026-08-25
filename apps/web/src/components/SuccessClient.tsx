@@ -4,7 +4,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { generateMockup, loadMockupSession, type MockupSession } from '@/lib/api';
+import {
+  generateMockup,
+  loadMockupSession,
+  saveMockupSession,
+  type MockupSession,
+} from '@/lib/api';
 import { MockupLoader } from '@/components/MockupLoader';
 
 type Phase = 'loading-session' | 'generating' | 'ready' | 'skipped' | 'error' | 'empty';
@@ -27,6 +32,18 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
 
   const ghlContactId = contactIdFromRoute || session?.contactId || null;
 
+  const markSessionGenerated = (current: MockupSession, submissionId?: string | null) => {
+    const next: MockupSession = {
+      ...current,
+      submissionId: submissionId || current.submissionId,
+      hasGenerated: true,
+      skipMockup: false,
+      shouldGenerate: true,
+    };
+    setSession(next);
+    saveMockupSession(next);
+  };
+
   useEffect(() => {
     const stored = loadMockupSession(contactIdFromRoute);
     if (!stored) {
@@ -41,7 +58,12 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
     };
     setSession(merged);
 
-    if (merged.skipMockup || !merged.shouldGenerate) {
+    if (merged.skipMockup && !merged.hasGenerated) {
+      setPhase('skipped');
+      return;
+    }
+
+    if (!merged.shouldGenerate && !merged.hasGenerated) {
       setPhase('skipped');
       return;
     }
@@ -57,14 +79,15 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
       job: merged.job,
     })
       .then((result) => {
-        if (result.skipped) {
-          setPhase('skipped');
-          return;
-        }
         if (result.imageDataUrl) {
           setImageDataUrl(result.imageDataUrl);
           if (result.logoDataUrl) setLogoDataUrl(result.logoDataUrl);
+          markSessionGenerated(merged, result.submissionId);
           setPhase('ready');
+          return;
+        }
+        if (result.skipped) {
+          setPhase('skipped');
           return;
         }
         setError('Mockup generated but no image was returned.');
@@ -91,6 +114,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
         if (result.imageDataUrl) {
           setImageDataUrl(result.imageDataUrl);
           if (result.logoDataUrl) setLogoDataUrl(result.logoDataUrl);
+          markSessionGenerated(session, result.submissionId);
           setPhase('ready');
           return;
         }
@@ -212,7 +236,7 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
               <h2 className="m-0 font-display text-2xl tracking-wide text-white">AI Mockup</h2>
               <p className="mt-3 text-sm text-white/55">
                 {session?.skipMockup
-                  ? 'A mockup was already generated for this Facebook lead, so we skipped a new one to control cost.'
+                  ? 'A free mockup was already generated for this lead, so we did not create another one.'
                   : 'Your quote was saved. Mockup auto-generation is off or unavailable on the server.'}
               </p>
               <button type="button" className="btn-primary mt-4" onClick={retry}>
