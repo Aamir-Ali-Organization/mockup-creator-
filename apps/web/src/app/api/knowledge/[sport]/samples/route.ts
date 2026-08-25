@@ -32,6 +32,7 @@ export async function POST(request: Request, { params }: Params) {
       filename: file.name || 'sample.png',
       mimeType: file.type || 'image/png',
       caption,
+      comboId: String(form.get('comboId') ?? '').trim() || null,
     });
 
     return Response.json({ success: true, profile });

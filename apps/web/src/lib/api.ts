@@ -31,6 +31,9 @@ export type MockupJob = {
   secondaryColor: string;
   alternateColor?: string | null;
   quantity: number;
+  shirtStyle?: string | null;
+  shirtType?: string | null;
+  shortType?: string | null;
   accessories: string[];
   rosterInfo?: string | null;
   logoCreation?: string | null;
@@ -111,6 +114,9 @@ export async function submitQuote(values: CreateQuotePayload): Promise<SubmitRes
   formData.append('secondaryColor', values.secondaryColor);
   formData.append('alternateColor', values.alternateColor || '');
   formData.append('quantity', String(values.quantity));
+  formData.append('shirtStyle', values.shirtStyle || '');
+  formData.append('shirtType', values.shirtType || '');
+  formData.append('shortType', values.shortType || '');
   formData.append('rosterInfo', values.rosterInfo || '');
   formData.append('logoCreation', values.logoCreation || '');
   formData.append('referralSource', values.referralSource);

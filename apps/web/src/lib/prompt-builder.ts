@@ -1,6 +1,7 @@
 import {
   LOGO_ATTACH_OPTION,
   LOGO_CREATE_OPTION,
+  resolveKnowledgeLayers,
   type AiPromptPayload,
   type KnowledgeProfile,
 } from '@mockup/shared';
@@ -19,6 +20,9 @@ export type QuotePromptInput = {
   logoCreation?: string | null;
   hasLogoFile?: boolean;
   rosterInfo?: string | null;
+  shirtStyle?: string | null;
+  shirtType?: string | null;
+  shortType?: string | null;
 };
 
 function resolveLogoMode(quote: QuotePromptInput): {
@@ -74,6 +78,21 @@ export function buildLogoPromptLine(
   ].join(' ');
 }
 
+export function buildGarmentPromptLine(payload: AiPromptPayload): string {
+  const style = (payload.shirtStyle || '').trim();
+  const shirtType = (payload.shirtType || '').trim();
+  const shortType = (payload.shortType || '').trim();
+  if (!style && !shirtType && !shortType) return '';
+  return [
+    'Uniform construction (follow exactly):',
+    style ? `shirt style = ${style}` : null,
+    shirtType ? `shirt type = ${shirtType}` : null,
+    shortType ? `short type = ${shortType}` : null,
+  ]
+    .filter(Boolean)
+    .join('; ');
+}
+
 export function buildAiPromptPayload(quote: QuotePromptInput): AiPromptPayload {
   const { wantsLogo, hasLogoFile } = resolveLogoMode(quote);
 
@@ -95,6 +114,9 @@ export function buildAiPromptPayload(quote: QuotePromptInput): AiPromptPayload {
     logoCreation: quote.logoCreation || undefined,
     hasLogoFile,
     rosterInfo: quote.rosterInfo || undefined,
+    shirtStyle: quote.shirtStyle || '',
+    shirtType: quote.shirtType || '',
+    shortType: quote.shortType || '',
   };
 }
 
@@ -107,12 +129,16 @@ function fillTemplate(
 
 /**
  * Builds the final OpenAI prompt from a knowledge profile + quote payload.
- * Instructions and knowledge base are fully dynamic (admin-editable).
+ * Optional combo overrides (instructions / notes / template) fall back to sport defaults.
  */
 export function buildPromptFromProfile(
   profile: KnowledgeProfile,
   payload: AiPromptPayload,
-  options?: { referenceSampleCount?: number; hasLogoFile?: boolean },
+  options?: {
+    referenceSampleCount?: number;
+    hasLogoFile?: boolean;
+    comboId?: string | null;
+  },
 ): string {
   const accessories =
     payload.accessories.length > 0
@@ -125,6 +151,8 @@ export function buildPromptFromProfile(
   };
 
   const logoLine = buildLogoPromptLine(payloadWithLogo, payload.team.name);
+  const garmentLine = buildGarmentPromptLine(payloadWithLogo);
+  const layers = resolveKnowledgeLayers(profile, options?.comboId);
 
   const alternate = payload.colors.alternate
     ? `Use ${payload.colors.alternate} as the sharp accent color.`
@@ -134,7 +162,7 @@ export function buildPromptFromProfile(
     ? `Roster / naming notes (do not invent jersey text unless clearly requested): ${payload.rosterInfo}`
     : '';
 
-  const filled = fillTemplate(profile.promptTemplate, {
+  const filled = fillTemplate(layers.promptTemplate, {
     teamName: payload.team.name,
     sport: payload.team.sport,
     gender: payload.team.gender,
@@ -145,21 +173,33 @@ export function buildPromptFromProfile(
     quantity: String(payload.quantity),
     accessories,
     logoLine,
+    garmentLine,
+    shirtStyle: payload.shirtStyle || '',
+    shirtType: payload.shirtType || '',
+    shortType: payload.shortType || '',
     rosterInfo,
   })
     .replace(/\s+/g, ' ')
     .trim();
 
+  const taskBody =
+    garmentLine && !filled.toLowerCase().includes('uniform construction')
+      ? `${filled} ${garmentLine}`
+      : filled;
+
   const sampleCount =
     options?.referenceSampleCount ?? profile.sampleImages.length;
   const hasLogo = Boolean(payloadWithLogo.hasLogoFile);
+  const knowledgeLabel = layers.comboId
+    ? `${profile.label} · ${layers.comboId}`
+    : profile.label;
 
   const parts = [
-    profile.instructions.trim(),
-    profile.knowledgeBase.trim()
-      ? `Knowledge base for ${profile.label}:\n${profile.knowledgeBase.trim()}`
+    layers.instructions.trim(),
+    layers.knowledgeBase.trim()
+      ? `Knowledge base for ${knowledgeLabel}:\n${layers.knowledgeBase.trim()}`
       : '',
-    `Task:\n${filled}`,
+    `Task:\n${taskBody}`,
     hasLogo
       ? 'Image order: (1) customer logo — use exactly on the uniform; (2+) style sample uniforms — match quality/construction/lighting only, never copy their logos/names/numbers.'
       : sampleCount > 0
@@ -178,6 +218,7 @@ export function buildPrompt(payload: AiPromptPayload): string {
       : 'no additional accessories';
 
   const logoLine = buildLogoPromptLine(payload, payload.team.name);
+  const garmentLine = buildGarmentPromptLine(payload);
 
   const alternate = payload.colors.alternate
     ? `Use ${payload.colors.alternate} as the sharp accent color.`
@@ -188,6 +229,7 @@ export function buildPrompt(payload: AiPromptPayload): string {
     `Use ${payload.colors.primary} as the dominant main color, ${payload.colors.secondary} as the secondary color.`,
     alternate,
     logoLine,
+    garmentLine,
     `Audience fit: ${payload.team.gender}, ${payload.team.ageGroup}.`,
     'Make the design look like premium modern custom sportswear made for competition — aggressive, clean, athletic, and visually distinctive.',
     'Use realistic performance fabric, sublimated graphics, crisp seams, accurate proportions, and high-definition detail.',
@@ -216,10 +258,15 @@ export async function buildPromptFromQuoteWithKnowledge(quote: QuotePromptInput)
     profile = await getKnowledgeProfile('Other');
   }
 
-  const refs = await collectStyleReferenceSamples(profile, 5);
+  const refs = await collectStyleReferenceSamples(profile, 5, {
+    gender: quote.gender,
+    shirtStyle: quote.shirtStyle,
+    shirtType: quote.shirtType,
+  });
   const prompt = buildPromptFromProfile(profile, payload, {
     referenceSampleCount: refs.sampleCountForPrompt,
     hasLogoFile: payload.hasLogoFile,
+    comboId: refs.comboId,
   });
-  return { payload, prompt, profile, sampleFiles: refs.samples };
+  return { payload, prompt, profile, sampleFiles: refs.samples, sampleSource: refs.source, comboId: refs.comboId };
 }

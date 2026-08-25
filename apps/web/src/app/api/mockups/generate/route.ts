@@ -33,6 +33,9 @@ const bodySchema = z.object({
     quantity: z.number(),
     accessories: z.array(z.string()).default([]),
     rosterInfo: z.string().optional().nullable(),
+    shirtStyle: z.string().optional().nullable(),
+    shirtType: z.string().optional().nullable(),
+    shortType: z.string().optional().nullable(),
     logoCreation: z.string().optional().nullable(),
     referralSource: z.string(),
   }),
@@ -95,7 +98,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const { prompt, payload, profile, sampleFiles } =
+    const { prompt, payload, profile, sampleFiles, comboId } =
       await buildPromptFromQuoteWithKnowledge({
         teamName: job.teamName,
         sport: job.sport,
@@ -110,6 +113,9 @@ export async function POST(request: Request) {
         hasLogoFile,
         logoFile: hasLogoFile ? 'attached' : null,
         rosterInfo: job.rosterInfo,
+        shirtStyle: job.shirtStyle || '',
+        shirtType: job.shirtType || '',
+        shortType: job.shortType || '',
       });
 
     if (!submissionId) {
@@ -140,6 +146,8 @@ export async function POST(request: Request) {
     console.info(
       '[mockups/generate] samples',
       sampleFiles.length,
+      'combo',
+      comboId,
       'logo',
       Boolean(logoForOpenAi),
       'sport',

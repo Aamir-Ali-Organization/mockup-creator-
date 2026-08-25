@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { knowledgeComboSampleSetSchema } from '@mockup/shared';
 import { assertKnowledgeAdmin } from '@/lib/knowledge-auth';
 import { getKnowledgeProfile, saveKnowledgeProfile } from '@/lib/knowledge-store';
 import { AppError, toErrorResponse } from '@/lib/errors';
@@ -11,6 +12,7 @@ const patchSchema = z.object({
   promptTemplate: z.string().optional(),
   enabled: z.boolean().optional(),
   label: z.string().optional(),
+  comboSampleSets: z.array(knowledgeComboSampleSetSchema).optional(),
 });
 
 type Params = { params: Promise<{ sport: string }> };

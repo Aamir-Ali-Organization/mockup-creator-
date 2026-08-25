@@ -11,6 +11,17 @@ export const knowledgeSampleSchema = z.object({
   uploadedAt: z.string(),
 });
 
+export const knowledgeComboSampleSetSchema = z.object({
+  comboId: z.string(),
+  samples: z.array(knowledgeSampleSchema).default([]),
+  /** Optional override — empty means fall back to sport-level instructions. */
+  instructions: z.string().optional().default(''),
+  /** Optional override — empty means fall back to sport-level knowledge. */
+  knowledgeBase: z.string().optional().default(''),
+  /** Optional override — empty means fall back to sport-level prompt template. */
+  promptTemplate: z.string().optional().default(''),
+});
+
 export const knowledgeProfileSchema = z.object({
   id: z.string(),
   sport: z.string(),
@@ -24,15 +35,54 @@ export const knowledgeProfileSchema = z.object({
    * Prompt template with placeholders:
    * {{teamName}} {{sport}} {{gender}} {{ageGroup}}
    * {{primaryColor}} {{secondaryColor}} {{alternateColor}}
-   * {{quantity}} {{accessories}} {{logoLine}} {{rosterInfo}}
+   * {{quantity}} {{accessories}} {{logoLine}} {{garmentLine}} {{rosterInfo}}
    */
   promptTemplate: z.string(),
+  /** General / fallback samples for this sport. */
   sampleImages: z.array(knowledgeSampleSchema).default([]),
+  /**
+   * Per style-combo samples (gender + fit + sleeve/hood).
+   * Used for Flag Football / 7v7 when quote garment options are known.
+   */
+  comboSampleSets: z.array(knowledgeComboSampleSetSchema).default([]),
   updatedAt: z.string(),
 });
 
 export type KnowledgeSample = z.infer<typeof knowledgeSampleSchema>;
+export type KnowledgeComboSampleSet = z.infer<typeof knowledgeComboSampleSetSchema>;
 export type KnowledgeProfile = z.infer<typeof knowledgeProfileSchema>;
+
+/** Resolve combo text with sport-level fallback when combo fields are blank. */
+export function resolveKnowledgeLayers(
+  profile: KnowledgeProfile,
+  comboId?: string | null,
+): {
+  instructions: string;
+  knowledgeBase: string;
+  promptTemplate: string;
+  comboId: string | null;
+  overrides: { instructions: boolean; knowledgeBase: boolean; promptTemplate: boolean };
+} {
+  const set = comboId
+    ? profile.comboSampleSets?.find((s) => s.comboId === comboId)
+    : undefined;
+
+  const instructions = set?.instructions?.trim() || profile.instructions;
+  const knowledgeBase = set?.knowledgeBase?.trim() || profile.knowledgeBase;
+  const promptTemplate = set?.promptTemplate?.trim() || profile.promptTemplate;
+
+  return {
+    instructions,
+    knowledgeBase,
+    promptTemplate,
+    comboId: comboId || null,
+    overrides: {
+      instructions: Boolean(set?.instructions?.trim()),
+      knowledgeBase: Boolean(set?.knowledgeBase?.trim()),
+      promptTemplate: Boolean(set?.promptTemplate?.trim()),
+    },
+  };
+}
 
 export function sportToSlug(sport: string): string {
   return sport
@@ -63,6 +113,7 @@ const MASTER_TEMPLATE = [
   'Use {{primaryColor}} as the dominant main color, {{secondaryColor}} as the secondary color.',
   '{{alternateColor}}',
   '{{logoLine}}',
+  '{{garmentLine}}',
   'Audience fit: {{gender}}, {{ageGroup}}.',
   'Suggested accessories context: {{accessories}}.',
   'Order quantity context: {{quantity}} uniforms (do not render quantity as text).',
@@ -75,6 +126,7 @@ const SPORT_TEMPLATES: Record<string, string> = {
     'Use {{primaryColor}} as the main color with {{secondaryColor}} and accent details.',
     '{{alternateColor}}',
     '{{logoLine}}',
+    '{{garmentLine}}',
     'Include a compression top and matching compression shorts with coordinated flags at the waist when relevant.',
     'Show a {{gender}} {{ageGroup}} athlete with an athletic build holding a football in a confident game-ready pose.',
     'Match gloves, cleats, and optional headgear to the uniform.',
@@ -86,6 +138,7 @@ const SPORT_TEMPLATES: Record<string, string> = {
     'Use {{primaryColor}} as the main color with {{secondaryColor}} and accent details.',
     '{{alternateColor}}',
     '{{logoLine}}',
+    '{{garmentLine}}',
     'Include a compression top and matching compression shorts with matching popper flags at the waist.',
     'Show a {{gender}} {{ageGroup}} athlete holding a football in a confident game-ready pose.',
     'Accessories context: {{accessories}}. Quantity context: {{quantity}} (do not render as text).',
@@ -206,6 +259,7 @@ export function createDefaultKnowledgeProfile(sport: string): KnowledgeProfile {
     knowledgeBase: DEFAULT_KNOWLEDGE,
     promptTemplate: SPORT_TEMPLATES[sport] ?? MASTER_TEMPLATE,
     sampleImages: [],
+    comboSampleSets: [],
     updatedAt: now,
   };
 }
@@ -225,5 +279,9 @@ export const KNOWLEDGE_PLACEHOLDERS = [
   'quantity',
   'accessories',
   'logoLine',
+  'garmentLine',
+  'shirtStyle',
+  'shirtType',
+  'shortType',
   'rosterInfo',
 ] as const;

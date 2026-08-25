@@ -24,6 +24,9 @@ export const submissionJobSchema = z.object({
   rosterInfo: z.string().optional().nullable(),
   logoCreation: z.string().optional().nullable(),
   referralSource: z.string().optional().nullable(),
+  shirtStyle: z.string().optional().nullable(),
+  shirtType: z.string().optional().nullable(),
+  shortType: z.string().optional().nullable(),
 });
 
 export const submissionRecordSchema = z.object({

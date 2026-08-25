@@ -39,6 +39,9 @@ export async function POST(request: Request) {
       quantity: formData.get('quantity'),
       accessories,
       rosterInfo: formData.get('rosterInfo') || '',
+      shirtStyle: formData.get('shirtStyle') || '',
+      shirtType: formData.get('shirtType') || '',
+      shortType: formData.get('shortType') || '',
       logoCreation: formData.get('logoCreation') || undefined,
       referralSource: formData.get('referralSource'),
       fleadid: formData.get('fleadid') || null,
@@ -79,6 +82,9 @@ export async function POST(request: Request) {
       hasLogoFile: Boolean(logoUpload),
       logoCreation: data.logoCreation || null,
       rosterInfo: data.rosterInfo,
+      shirtStyle: data.shirtStyle || '',
+      shirtType: data.shirtType || '',
+      shortType: data.shortType || '',
     });
 
     let contactId = ghlContactId;
@@ -96,13 +102,16 @@ export async function POST(request: Request) {
         primaryColor: data.primaryColor,
         secondaryColor: data.secondaryColor,
         alternateColor: data.alternateColor,
-        quantity: data.quantity,
-        accessories: data.accessories,
-        rosterInfo: data.rosterInfo,
-        logoCreation: data.logoCreation || null,
-        referralSource: data.referralSource,
-        mockupGenerated: skipMockup,
-      });
+      quantity: data.quantity,
+      accessories: data.accessories,
+      rosterInfo: data.rosterInfo,
+      shirtStyle: data.shirtStyle || '',
+      shirtType: data.shirtType || '',
+      shortType: data.shortType || '',
+      logoCreation: data.logoCreation || null,
+      referralSource: data.referralSource,
+      mockupGenerated: skipMockup,
+    });
       contactId = ghlResult.contactId;
     }
 
@@ -120,6 +129,9 @@ export async function POST(request: Request) {
       quantity: data.quantity,
       accessories: data.accessories,
       rosterInfo: data.rosterInfo,
+      shirtStyle: data.shirtStyle || '',
+      shirtType: data.shirtType || '',
+      shortType: data.shortType || '',
       logoCreation: data.logoCreation || null,
       referralSource: data.referralSource,
     };

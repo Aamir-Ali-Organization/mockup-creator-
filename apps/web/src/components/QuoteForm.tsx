@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Controller, FormProvider, useForm } from 'react-hook-form';
+import { Controller, FormProvider, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10,7 +10,12 @@ import {
   GENDERS,
   PUBLIC_SPORTS,
   REFERRAL_SOURCES,
+  SHIRT_STYLES,
+  SHIRT_TYPES,
+  SHORT_TYPES,
+  genderLocksAdult,
   quoteFormSchema,
+  sportNeedsGarmentDetails,
   type QuoteFormValues,
 } from '@mockup/shared';
 import { buildSuccessPath, resolveLead, saveMockupSession, submitQuote } from '@/lib/api';
@@ -29,7 +34,16 @@ const STEPS = ['Contact', 'Team Look', 'Extras', 'Submit'] as const;
 
 const stepFields: Record<number, (keyof FormValues)[]> = {
   1: ['customerName', 'phone', 'email', 'teamName', 'sport'],
-  2: ['primaryColor', 'secondaryColor', 'gender', 'ageGroup', 'quantity'],
+  2: [
+    'primaryColor',
+    'secondaryColor',
+    'gender',
+    'ageGroup',
+    'quantity',
+    'shirtStyle',
+    'shirtType',
+    'shortType',
+  ],
   3: ['accessories', 'rosterInfo', 'logoCreation', 'logoFile'],
   4: ['referralSource', 'consent'],
 };
@@ -72,6 +86,9 @@ export function QuoteForm() {
       secondaryColor: '',
       alternateColor: '',
       quantity: 12,
+      shirtStyle: '',
+      shirtType: '',
+      shortType: '',
       accessories: [],
       rosterInfo: '',
       logoCreation: '',
@@ -79,6 +96,23 @@ export function QuoteForm() {
       consent: undefined,
     },
   });
+
+  const sport = useWatch({ control: methods.control, name: 'sport' });
+  const gender = useWatch({ control: methods.control, name: 'gender' });
+  const showGarmentDetails = sportNeedsGarmentDetails(sport || '');
+  const adultLocked = genderLocksAdult(gender || '');
+
+  useEffect(() => {
+    if (!adultLocked) return;
+    methods.setValue('ageGroup', 'Adult', { shouldValidate: true, shouldDirty: true });
+  }, [adultLocked, methods]);
+
+  useEffect(() => {
+    if (showGarmentDetails) return;
+    methods.setValue('shirtStyle', '', { shouldValidate: false });
+    methods.setValue('shirtType', '', { shouldValidate: false });
+    methods.setValue('shortType', '', { shouldValidate: false });
+  }, [showGarmentDetails, methods]);
 
   useEffect(() => {
     const prefill = leadQuery.data?.lead.prefill;
@@ -93,6 +127,18 @@ export function QuoteForm() {
           shouldValidate: false,
           shouldDirty: false,
         });
+        continue;
+      }
+      if (key === 'gender') {
+        const allowed = (GENDERS as readonly string[]).includes(String(value));
+        if (!allowed) continue;
+        methods.setValue('gender', value as never, { shouldValidate: false, shouldDirty: false });
+        continue;
+      }
+      if (key === 'ageGroup') {
+        const allowed = (AGE_GROUPS as readonly string[]).includes(String(value));
+        if (!allowed) continue;
+        methods.setValue('ageGroup', value as never, { shouldValidate: false, shouldDirty: false });
         continue;
       }
       const next =
@@ -268,10 +314,50 @@ export function QuoteForm() {
                 label="Youth or Adult"
                 requiredMark
                 options={AGE_GROUPS}
+                hint={adultLocked ? 'Adult is required for Mens / Womens' : undefined}
                 error={errors.ageGroup?.message}
                 {...register('ageGroup')}
+                className={adultLocked ? 'pointer-events-none opacity-70' : undefined}
+                aria-disabled={adultLocked || undefined}
+                tabIndex={adultLocked ? -1 : undefined}
+                onChange={(event) => {
+                  if (adultLocked) {
+                    methods.setValue('ageGroup', 'Adult', { shouldValidate: true });
+                    return;
+                  }
+                  void register('ageGroup').onChange(event);
+                }}
               />
             </div>
+            {showGarmentDetails ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <SelectField
+                  className="sm:col-span-2"
+                  label="Shirt Style"
+                  requiredMark
+                  placeholder="Select shirt style"
+                  options={SHIRT_STYLES}
+                  error={errors.shirtStyle?.message}
+                  {...register('shirtStyle')}
+                />
+                <SelectField
+                  label="Shirt Type"
+                  requiredMark
+                  placeholder="Select shirt type"
+                  options={SHIRT_TYPES}
+                  error={errors.shirtType?.message}
+                  {...register('shirtType')}
+                />
+                <SelectField
+                  label="Short Type"
+                  requiredMark
+                  placeholder="Select short type"
+                  options={SHORT_TYPES}
+                  error={errors.shortType?.message}
+                  {...register('shortType')}
+                />
+              </div>
+            ) : null}
           </section>
         ) : null}
 

@@ -15,7 +15,10 @@ export async function GET(request: Request) {
         sport: p.sport,
         label: p.label,
         enabled: p.enabled,
-        sampleCount: p.sampleImages.length,
+        sampleCount:
+          p.sampleImages.length +
+          (p.comboSampleSets ?? []).reduce((sum, set) => sum + set.samples.length, 0),
+        comboCount: (p.comboSampleSets ?? []).filter((s) => s.samples.length > 0).length,
         updatedAt: p.updatedAt,
       })),
     });

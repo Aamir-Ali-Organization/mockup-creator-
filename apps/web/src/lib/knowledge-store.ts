@@ -5,8 +5,11 @@ import { randomUUID } from 'node:crypto';
 import {
   createDefaultKnowledgeProfile,
   createDefaultKnowledgeProfiles,
+  getStyleComboById,
   knowledgeProfileSchema,
+  resolveStyleComboId,
   sportToSlug,
+  sportUsesStyleCombos,
   type KnowledgeProfile,
   type KnowledgeSample,
   SPORTS,
@@ -267,12 +270,18 @@ export async function saveKnowledgeProfile(
   patch: Partial<
     Pick<
       KnowledgeProfile,
-      'instructions' | 'knowledgeBase' | 'promptTemplate' | 'enabled' | 'label' | 'sampleImages'
+      | 'instructions'
+      | 'knowledgeBase'
+      | 'promptTemplate'
+      | 'enabled'
+      | 'label'
+      | 'sampleImages'
+      | 'comboSampleSets'
     >
   >,
 ): Promise<KnowledgeProfile> {
   const current =
-    patch.sampleImages !== undefined
+    patch.sampleImages !== undefined || patch.comboSampleSets !== undefined
       ? await getFreshProfileForMutation(sportOrSlug)
       : await getKnowledgeProfile(sportOrSlug);
 
@@ -294,10 +303,17 @@ export async function addKnowledgeSample(input: {
   filename: string;
   mimeType: string;
   caption?: string;
+  /** When set, sample is stored under this style combo instead of general samples. */
+  comboId?: string | null;
 }): Promise<KnowledgeProfile> {
   const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/jpg'];
   if (!allowed.includes(input.mimeType)) {
     throw new AppError('Sample must be PNG, JPEG, or WebP', 400);
+  }
+
+  const comboId = input.comboId?.trim() || '';
+  if (comboId && !getStyleComboById(comboId)) {
+    throw new AppError('Unknown style combination', 400);
   }
 
   const profile = await getFreshProfileForMutation(input.sportOrSlug);
@@ -317,7 +333,6 @@ export async function addKnowledgeSample(input: {
   if (hasBlobStorage()) {
     try {
       const uploaded = await putBlob(pathname, input.buffer, input.mimeType);
-      // Prefer API proxy URL so private blobs still render in admin.
       url = `/api/knowledge/${profile.id}/samples/file/${filename}`;
       void uploaded;
     } catch (error) {
@@ -352,11 +367,37 @@ export async function addKnowledgeSample(input: {
     uploadedAt: new Date().toISOString(),
   };
 
-  const next: KnowledgeProfile = knowledgeProfileSchema.parse({
-    ...profile,
-    sampleImages: [...profile.sampleImages, sample],
-    updatedAt: new Date().toISOString(),
-  });
+  let next: KnowledgeProfile;
+  if (comboId) {
+    const sets = [...(profile.comboSampleSets ?? [])];
+    const index = sets.findIndex((s) => s.comboId === comboId);
+    if (index >= 0) {
+      sets[index] = {
+        ...sets[index],
+        samples: [...sets[index].samples, sample],
+      };
+    } else {
+      sets.push({
+        comboId,
+        samples: [sample],
+        instructions: '',
+        knowledgeBase: '',
+        promptTemplate: '',
+      });
+    }
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      comboSampleSets: sets,
+      updatedAt: new Date().toISOString(),
+    });
+  } else {
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      sampleImages: [...profile.sampleImages, sample],
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   await writeProfileFile(next);
   return next;
 }
@@ -366,7 +407,22 @@ export async function removeKnowledgeSample(
   sampleId: string,
 ): Promise<KnowledgeProfile> {
   const profile = await getFreshProfileForMutation(sportOrSlug);
-  const sample = profile.sampleImages.find((s) => s.id === sampleId);
+
+  const general = profile.sampleImages.find((s) => s.id === sampleId);
+  let sample = general;
+  let fromComboId: string | null = null;
+
+  if (!sample) {
+    for (const set of profile.comboSampleSets ?? []) {
+      const found = set.samples.find((s) => s.id === sampleId);
+      if (found) {
+        sample = found;
+        fromComboId = set.comboId;
+        break;
+      }
+    }
+  }
+
   if (!sample) throw new AppError('Sample not found', 404);
 
   if (sample.pathname) {
@@ -375,19 +431,30 @@ export async function removeKnowledgeSample(
   await unlink(path.join(sampleDir(profile.id), sample.filename)).catch(() => undefined);
   await unlink(path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename)).catch(() => undefined);
 
-  const next: KnowledgeProfile = knowledgeProfileSchema.parse({
-    ...profile,
-    sampleImages: profile.sampleImages.filter((s) => s.id !== sampleId),
-    updatedAt: new Date().toISOString(),
-  });
-
-  // Safety: never persist an accidental full wipe when we expected one removal
-  // but somehow lost the list (should not happen after getFreshProfileForMutation).
-  if (
-    next.sampleImages.length === 0 &&
-    profile.sampleImages.length > 1
-  ) {
-    throw new AppError('Refusing to remove all samples from a partial delete', 500);
+  let next: KnowledgeProfile;
+  if (fromComboId) {
+    const sets = (profile.comboSampleSets ?? [])
+      .map((set) =>
+        set.comboId === fromComboId
+          ? { ...set, samples: set.samples.filter((s) => s.id !== sampleId) }
+          : set,
+      )
+      .filter((set) => set.samples.length > 0);
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      comboSampleSets: sets,
+      updatedAt: new Date().toISOString(),
+    });
+  } else {
+    const remaining = profile.sampleImages.filter((s) => s.id !== sampleId);
+    if (remaining.length === 0 && profile.sampleImages.length > 1) {
+      throw new AppError('Refusing to remove all samples from a partial delete', 500);
+    }
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      sampleImages: remaining,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   await writeProfileFile(next);
@@ -401,10 +468,13 @@ export type ResolvedSample = {
   buffer?: Buffer;
 };
 
-export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<ResolvedSample[]> {
+async function resolveSamplesList(
+  profile: KnowledgeProfile,
+  samples: KnowledgeSample[],
+): Promise<ResolvedSample[]> {
   const results: ResolvedSample[] = [];
 
-  for (const sample of profile.sampleImages) {
+  for (const sample of samples) {
     const ext = path.extname(sample.filename).toLowerCase();
     const mimeType =
       ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
@@ -417,7 +487,6 @@ export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<Res
       }
     }
 
-    // Fallback pathname convention for older samples.
     if (hasBlobStorage()) {
       const guessed = sampleBlobPath(profile.id, sample.filename);
       const bytes = await getBlobBytes(guessed);
@@ -446,21 +515,77 @@ export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<Res
   return results;
 }
 
+export async function resolveSampleFiles(profile: KnowledgeProfile): Promise<ResolvedSample[]> {
+  return resolveSamplesList(profile, profile.sampleImages);
+}
+
+export function getComboSamples(
+  profile: KnowledgeProfile,
+  comboId: string,
+): KnowledgeSample[] {
+  return profile.comboSampleSets?.find((s) => s.comboId === comboId)?.samples ?? [];
+}
+
 /**
- * Prefer this sport's samples; if missing/empty, borrow brand samples from other sports
- * so style references still reach OpenAI (samples are otherwise per-sport only).
+ * Prefer exact style-combo samples for Flag Football / 7v7 quotes.
+ * Fall back to sport general samples, then other sports.
  */
 export async function collectStyleReferenceSamples(
   primary: KnowledgeProfile,
   max = 5,
-): Promise<{ samples: ResolvedSample[]; sampleCountForPrompt: number; source: string }> {
+  quote?: {
+    gender?: string | null;
+    shirtStyle?: string | null;
+    shirtType?: string | null;
+  },
+): Promise<{
+  samples: ResolvedSample[];
+  sampleCountForPrompt: number;
+  source: string;
+  comboId: string | null;
+}> {
+  const comboId =
+    sportUsesStyleCombos(primary.sport) && quote
+      ? resolveStyleComboId(quote)
+      : null;
+
+  if (comboId) {
+    const comboSamples = getComboSamples(primary, comboId);
+    if (comboSamples.length > 0) {
+      const files = await resolveSamplesList(primary, comboSamples);
+      if (files.length > 0) {
+        return {
+          samples: files.slice(0, max),
+          sampleCountForPrompt: files.length,
+          source: `${primary.id}:${comboId}`,
+          comboId,
+        };
+      }
+    }
+  }
+
   const primaryFiles = await resolveSampleFiles(primary);
   if (primaryFiles.length > 0) {
     return {
       samples: primaryFiles.slice(0, max),
       sampleCountForPrompt: primaryFiles.length,
       source: primary.id,
+      comboId,
     };
+  }
+
+  // Borrow any combo samples from this sport if general is empty.
+  const allComboSamples = (primary.comboSampleSets ?? []).flatMap((s) => s.samples);
+  if (allComboSamples.length > 0) {
+    const files = await resolveSamplesList(primary, allComboSamples);
+    if (files.length > 0) {
+      return {
+        samples: files.slice(0, max),
+        sampleCountForPrompt: files.length,
+        source: `${primary.id}:any-combo`,
+        comboId,
+      };
+    }
   }
 
   const all = await listKnowledgeProfiles();
@@ -470,8 +595,12 @@ export async function collectStyleReferenceSamples(
 
   for (const profile of all) {
     if (profile.id === primary.id) continue;
-    if (!profile.sampleImages.length) continue;
-    const files = await resolveSampleFiles(profile);
+    const pool = [
+      ...profile.sampleImages,
+      ...(profile.comboSampleSets ?? []).flatMap((s) => s.samples),
+    ];
+    if (!pool.length) continue;
+    const files = await resolveSamplesList(profile, pool);
     if (!files.length) continue;
     sources.push(profile.id);
     for (const file of files) {
@@ -488,6 +617,7 @@ export async function collectStyleReferenceSamples(
     samples: merged.slice(0, max),
     sampleCountForPrompt: merged.length,
     source: sources.length ? `brand-fallback:${sources.join(',')}` : 'none',
+    comboId,
   };
 }
 

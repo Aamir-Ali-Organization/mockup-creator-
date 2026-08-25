@@ -17,9 +17,36 @@ export const SPORTS = [
 /** Sports shown on the public quote form. Full `SPORTS` stays available in knowledge admin. */
 export const PUBLIC_SPORTS = ['Flag Football'] as const;
 
-export const GENDERS = ['Mens', 'Womens', 'Boys', 'Girls', 'Co-ed'] as const;
+export const GENDERS = ['Mens', 'Womens', 'Boys', 'Girls'] as const;
 
-export const AGE_GROUPS = ['Youth', 'Adult', 'Both'] as const;
+export const AGE_GROUPS = ['Youth', 'Adult'] as const;
+
+/** Genders that always use Adult sizing (Youth/Adult locked). */
+export const ADULT_LOCKED_GENDERS = ['Mens', 'Womens'] as const;
+
+/** Sports that collect shirt/short construction details. */
+export const GARMENT_DETAIL_SPORTS = ['Flag Football', '7v7'] as const;
+
+export const SHIRT_STYLES = [
+  'DRI FIT short sleeves',
+  'DRIFIT Sleeveless',
+  'DRIFIT Sleeveless with Hoodie',
+  'DRIFIT short sleeves with Hoodie',
+  'DRIFIT long sleeves with Hoodie',
+  'DRIFIT long sleeves with NO Hoodie',
+] as const;
+
+export const SHIRT_TYPES = ['COMPRESSION DRI-FIT', 'REGULAR FIT DRI-FIT'] as const;
+
+export const SHORT_TYPES = ['COMPRESSION DRI-FIT', 'REGULAR FIT DRI-FIT'] as const;
+
+export function sportNeedsGarmentDetails(sport: string) {
+  return (GARMENT_DETAIL_SPORTS as readonly string[]).includes(sport);
+}
+
+export function genderLocksAdult(gender: string) {
+  return (ADULT_LOCKED_GENDERS as readonly string[]).includes(gender);
+}
 
 export const LOGO_CREATION_OPTIONS = [
   'Yes — create a new logo',

@@ -25,7 +25,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(funct
         ref={ref}
         id={fieldId}
         aria-invalid={error ? true : undefined}
-        className={`input-field pr-10 ${error ? 'border-heat/70 focus:border-heat focus:shadow-[0_0_0_4px_rgba(227,6,19,0.18)]' : ''}`}
+        className={`input-field pr-10 ${props.disabled ? 'cursor-not-allowed opacity-60' : ''} ${error ? 'border-heat/70 focus:border-heat focus:shadow-[0_0_0_4px_rgba(227,6,19,0.18)]' : ''}`}
         {...props}
         onFocus={(event) => {
           props.onChange?.(event);

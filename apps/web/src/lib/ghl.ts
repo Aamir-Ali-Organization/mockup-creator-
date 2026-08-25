@@ -54,6 +54,9 @@ type UpsertLeadInput = {
   quantity: number;
   accessories: string[];
   rosterInfo?: string;
+  shirtStyle?: string | null;
+  shirtType?: string | null;
+  shortType?: string | null;
   logoCreation?: string | null;
   referralSource: string;
   mockupGenerated?: boolean;
@@ -277,6 +280,9 @@ function buildCustomFields(input: UpsertLeadInput) {
     quantity: String(input.quantity),
     accessories: input.accessories.join(', '),
     roster_info: input.rosterInfo || '',
+    shirt_style: input.shirtStyle || '',
+    shirt_type: input.shirtType || '',
+    short_type: input.shortType || '',
     logo_creation: input.logoCreation || '',
     referral_source: input.referralSource,
   };
