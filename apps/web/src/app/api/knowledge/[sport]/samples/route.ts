@@ -33,6 +33,7 @@ export async function POST(request: Request, { params }: Params) {
       mimeType: file.type || 'image/png',
       caption,
       comboId: String(form.get('comboId') ?? '').trim() || null,
+      logoComposition: String(form.get('logoComposition') ?? '').trim() || null,
     });
 
     return Response.json({ success: true, profile });

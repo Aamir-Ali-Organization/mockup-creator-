@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  LOGO_COMPOSITION_OPTIONS,
   LOGO_PROMPT_PLACEHOLDERS,
   PUBLIC_SPORTS,
   STYLE_COMBO_DEFINITIONS,
   STYLE_FITS,
   STYLE_GENDER_FAMILIES,
+  getLogoSamplesForComposition,
   getStyleComboById,
   sportToSlug,
   sportUsesStyleCombos,
@@ -81,6 +83,7 @@ function snapshotOf(profile: KnowledgeProfile) {
     promptTemplate: profile.promptTemplate,
     logoInstructions: profile.logoInstructions,
     logoPromptTemplate: profile.logoPromptTemplate,
+    logoSampleSets: profile.logoSampleSets ?? [],
     enabled: profile.enabled,
     label: profile.label,
     comboSampleSets: profile.comboSampleSets ?? [],
@@ -305,6 +308,7 @@ export function KnowledgeAdminClient() {
           promptTemplate: draft.promptTemplate,
           logoInstructions: draft.logoInstructions,
           logoPromptTemplate: draft.logoPromptTemplate,
+          logoSampleSets: draft.logoSampleSets ?? [],
           enabled: draft.enabled,
           label: draft.label,
           comboSampleSets: draft.comboSampleSets ?? [],
@@ -326,14 +330,17 @@ export function KnowledgeAdminClient() {
     mutationFn: async ({
       file,
       comboId,
+      logoComposition,
     }: {
       file: File;
       comboId?: string | null;
+      logoComposition?: string | null;
     }) => {
       if (!draft) throw new Error('Select a sport first');
       const form = new FormData();
       form.append('file', file);
       if (comboId) form.append('comboId', comboId);
+      if (logoComposition) form.append('logoComposition', logoComposition);
       const res = await fetch(`/api/knowledge/${draft.id}/samples`, {
         method: 'POST',
         credentials: 'include',
@@ -349,9 +356,16 @@ export function KnowledgeAdminClient() {
     onError: (err: Error) => showToast(err.message, 'err'),
   });
 
-  const uploadFile = (file: File, comboId?: string | null) => {
+  const uploadFile = (
+    file: File,
+    options?: { comboId?: string | null; logoComposition?: string | null },
+  ) => {
     if (!draft) return;
-    uploadMutation.mutate({ file, comboId: comboId ?? null });
+    uploadMutation.mutate({
+      file,
+      comboId: options?.comboId ?? null,
+      logoComposition: options?.logoComposition ?? null,
+    });
   };
 
   const deleteMutation = useMutation({
@@ -925,7 +939,7 @@ export function KnowledgeAdminClient() {
                                       e.preventDefault();
                                       setDragOver(false);
                                       const file = e.dataTransfer.files?.[0];
-                                      if (file) uploadFile(file, modalCombo.id);
+                                      if (file) uploadFile(file, { comboId: modalCombo.id });
                                     }}
                                     className={`rounded-2xl border border-dashed px-5 py-8 text-center transition ${
                                       dragOver
@@ -946,7 +960,7 @@ export function KnowledgeAdminClient() {
                                         disabled={uploadMutation.isPending}
                                         onChange={(e) => {
                                           const file = e.target.files?.[0];
-                                          if (file) uploadFile(file, modalCombo.id);
+                                          if (file) uploadFile(file, { comboId: modalCombo.id });
                                           e.target.value = '';
                                         }}
                                       />
@@ -1225,6 +1239,83 @@ export function KnowledgeAdminClient() {
                       optional lines that auto-hide when empty.
                     </p>
                   </label>
+
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="m-0 text-sm font-semibold text-white/80">
+                        Logo samples by type
+                      </h4>
+                      <p className="mt-1 text-sm text-white/45">
+                        Upload example logos for each form category. When a lead picks that logo
+                        type, these images guide the free logo AI.
+                      </p>
+                    </div>
+
+                    {LOGO_COMPOSITION_OPTIONS.map((composition) => {
+                      const samples = getLogoSamplesForComposition(draft, composition);
+                      return (
+                        <div
+                          key={composition}
+                          className="rounded-xl border border-white/10 bg-white/[0.02] p-3 sm:p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="m-0 text-sm font-semibold text-white">{composition}</p>
+                              <p className="mt-0.5 text-xs text-white/40">
+                                {samples.length
+                                  ? `${samples.length} sample${samples.length === 1 ? '' : 's'}`
+                                  : 'No samples yet'}
+                              </p>
+                            </div>
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-white transition hover:border-accent/50 hover:text-accent">
+                              {uploadMutation.isPending ? 'Uploading…' : 'Add photo'}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="sr-only"
+                                disabled={uploadMutation.isPending}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = '';
+                                  if (file) {
+                                    uploadFile(file, { logoComposition: composition });
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+
+                          {samples.length > 0 ? (
+                            <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                              {samples.map((sample) => (
+                                <li
+                                  key={sample.id}
+                                  className="overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={sample.url}
+                                    alt={sample.caption || sample.filename}
+                                    className="aspect-square w-full object-cover"
+                                  />
+                                  <div className="flex items-center justify-end px-2 py-1.5">
+                                    <button
+                                      type="button"
+                                      className="rounded-md px-1.5 py-0.5 text-[11px] text-red-300"
+                                      disabled={deleteMutation.isPending}
+                                      onClick={() => deleteMutation.mutate(sample.id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

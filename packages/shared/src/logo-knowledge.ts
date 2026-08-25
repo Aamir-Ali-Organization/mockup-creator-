@@ -24,6 +24,7 @@ export const DEFAULT_LOGO_INSTRUCTIONS = [
   'Output ONLY the logo centered on a clean solid white background.',
   'No mockup, no jersey, no athlete, no watermark, no extra text outside the logo.',
   'High-definition vector-like clarity suitable for sublimation and embroidery.',
+  'If reference logo sample images are provided, match their quality, composition style, and production clarity — but create a NEW original logo for this team. Do not copy text, mascots, or marks from the samples.',
 ].join(' ');
 
 export const DEFAULT_LOGO_PROMPT_TEMPLATE = [

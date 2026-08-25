@@ -17,7 +17,8 @@ export async function GET(request: Request) {
         enabled: p.enabled,
         sampleCount:
           p.sampleImages.length +
-          (p.comboSampleSets ?? []).reduce((sum, set) => sum + set.samples.length, 0),
+          (p.comboSampleSets ?? []).reduce((sum, set) => sum + set.samples.length, 0) +
+          (p.logoSampleSets ?? []).reduce((sum, set) => sum + set.samples.length, 0),
         comboCount: (p.comboSampleSets ?? []).filter((s) => s.samples.length > 0).length,
         updatedAt: p.updatedAt,
       })),

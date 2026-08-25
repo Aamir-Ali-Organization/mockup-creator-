@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SPORTS } from './constants.js';
+import { LOGO_COMPOSITION_OPTIONS, SPORTS } from './constants.js';
 import {
   DEFAULT_LOGO_INSTRUCTIONS,
   DEFAULT_LOGO_PROMPT_TEMPLATE,
@@ -24,6 +24,12 @@ export const knowledgeComboSampleSetSchema = z.object({
   knowledgeBase: z.string().optional().default(''),
   /** Optional override — empty means fall back to sport-level prompt template. */
   promptTemplate: z.string().optional().default(''),
+});
+
+/** Logo reference samples keyed by form logo type (composition). */
+export const knowledgeLogoSampleSetSchema = z.object({
+  composition: z.string(),
+  samples: z.array(knowledgeSampleSchema).default([]),
 });
 
 export const knowledgeProfileSchema = z.object({
@@ -53,6 +59,11 @@ export const knowledgeProfileSchema = z.object({
    * {{colors}} {{logoNotes}} {{textSentence}} {{iconSentence}} {{notesSentence}} …
    */
   logoPromptTemplate: z.string().default(DEFAULT_LOGO_PROMPT_TEMPLATE),
+  /**
+   * Logo reference samples per form logo type (composition).
+   * Used as style refs when generating a free logo for that category.
+   */
+  logoSampleSets: z.array(knowledgeLogoSampleSetSchema).default([]),
   /** General / fallback samples for this sport. */
   sampleImages: z.array(knowledgeSampleSchema).default([]),
   /**
@@ -65,7 +76,23 @@ export const knowledgeProfileSchema = z.object({
 
 export type KnowledgeSample = z.infer<typeof knowledgeSampleSchema>;
 export type KnowledgeComboSampleSet = z.infer<typeof knowledgeComboSampleSetSchema>;
+export type KnowledgeLogoSampleSet = z.infer<typeof knowledgeLogoSampleSetSchema>;
 export type KnowledgeProfile = z.infer<typeof knowledgeProfileSchema>;
+
+export function isLogoCompositionOption(
+  value: string,
+): value is (typeof LOGO_COMPOSITION_OPTIONS)[number] {
+  return (LOGO_COMPOSITION_OPTIONS as readonly string[]).includes(value);
+}
+
+export function getLogoSamplesForComposition(
+  profile: KnowledgeProfile,
+  composition?: string | null,
+): KnowledgeSample[] {
+  const key = (composition || '').trim();
+  if (!key) return [];
+  return profile.logoSampleSets?.find((s) => s.composition === key)?.samples ?? [];
+}
 
 /** Resolve combo text with sport-level fallback when combo fields are blank. */
 export function resolveKnowledgeLayers(
@@ -275,6 +302,7 @@ export function createDefaultKnowledgeProfile(sport: string): KnowledgeProfile {
     promptTemplate: SPORT_TEMPLATES[sport] ?? MASTER_TEMPLATE,
     logoInstructions: DEFAULT_LOGO_INSTRUCTIONS,
     logoPromptTemplate: DEFAULT_LOGO_PROMPT_TEMPLATE,
+    logoSampleSets: [],
     sampleImages: [],
     comboSampleSets: [],
     updatedAt: now,

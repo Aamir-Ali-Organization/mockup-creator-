@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { knowledgeComboSampleSetSchema } from '@mockup/shared';
+import { knowledgeComboSampleSetSchema, knowledgeLogoSampleSetSchema } from '@mockup/shared';
 import { assertKnowledgeAdmin } from '@/lib/knowledge-auth';
 import { getKnowledgeProfile, saveKnowledgeProfile } from '@/lib/knowledge-store';
 import { AppError, toErrorResponse } from '@/lib/errors';
@@ -12,6 +12,7 @@ const patchSchema = z.object({
   promptTemplate: z.string().optional(),
   logoInstructions: z.string().optional(),
   logoPromptTemplate: z.string().optional(),
+  logoSampleSets: z.array(knowledgeLogoSampleSetSchema).optional(),
   enabled: z.boolean().optional(),
   label: z.string().optional(),
   comboSampleSets: z.array(knowledgeComboSampleSetSchema).optional(),

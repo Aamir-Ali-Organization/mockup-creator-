@@ -10,7 +10,7 @@ import {
   generateMockupImage,
 } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
-import { getKnowledgeProfile } from '@/lib/knowledge-store';
+import { getKnowledgeProfile, collectLogoReferenceSamples } from '@/lib/knowledge-store';
 import {
   createSubmission,
   getSubmission,
@@ -157,8 +157,25 @@ export async function POST(request: Request) {
         },
       );
 
-      console.info('[mockups/generate] step1 logo for', job.teamName, job.sport);
-      const logoImage = await generateLogoImage(logoPrompt);
+      const logoRefs = await collectLogoReferenceSamples(
+        sportProfile,
+        job.logoComposition,
+        4,
+      );
+      const logoPromptWithRefs =
+        logoRefs.sampleCountForPrompt > 0
+          ? `${logoPrompt} Reference logo sample images are attached (${logoRefs.sampleCountForPrompt}). Match their quality, composition style, and production clarity only — create a NEW original logo for ${job.teamName}. Do not copy text, mascots, or marks from the samples.`
+          : logoPrompt;
+
+      console.info(
+        '[mockups/generate] step1 logo for',
+        job.teamName,
+        job.sport,
+        'samples=',
+        logoRefs.sampleCountForPrompt,
+        logoRefs.source,
+      );
+      const logoImage = await generateLogoImage(logoPromptWithRefs, logoRefs.samples);
       logoDataUrl = logoImage.dataUrl;
       const parsedLogo = dataUrlToBuffer(logoImage.dataUrl);
       logoForOpenAi = {

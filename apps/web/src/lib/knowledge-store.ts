@@ -5,7 +5,9 @@ import { randomUUID } from 'node:crypto';
 import {
   createDefaultKnowledgeProfile,
   createDefaultKnowledgeProfiles,
+  getLogoSamplesForComposition,
   getStyleComboById,
+  isLogoCompositionOption,
   knowledgeProfileSchema,
   resolveStyleComboId,
   sportToSlug,
@@ -275,6 +277,7 @@ export async function saveKnowledgeProfile(
       | 'promptTemplate'
       | 'logoInstructions'
       | 'logoPromptTemplate'
+      | 'logoSampleSets'
       | 'enabled'
       | 'label'
       | 'sampleImages'
@@ -283,7 +286,9 @@ export async function saveKnowledgeProfile(
   >,
 ): Promise<KnowledgeProfile> {
   const current =
-    patch.sampleImages !== undefined || patch.comboSampleSets !== undefined
+    patch.sampleImages !== undefined ||
+    patch.comboSampleSets !== undefined ||
+    patch.logoSampleSets !== undefined
       ? await getFreshProfileForMutation(sportOrSlug)
       : await getKnowledgeProfile(sportOrSlug);
 
@@ -307,6 +312,8 @@ export async function addKnowledgeSample(input: {
   caption?: string;
   /** When set, sample is stored under this style combo instead of general samples. */
   comboId?: string | null;
+  /** When set, sample is stored under this logo composition category. */
+  logoComposition?: string | null;
 }): Promise<KnowledgeProfile> {
   const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/jpg'];
   if (!allowed.includes(input.mimeType)) {
@@ -314,8 +321,15 @@ export async function addKnowledgeSample(input: {
   }
 
   const comboId = input.comboId?.trim() || '';
+  const logoComposition = input.logoComposition?.trim() || '';
+  if (comboId && logoComposition) {
+    throw new AppError('Provide either comboId or logoComposition, not both', 400);
+  }
   if (comboId && !getStyleComboById(comboId)) {
     throw new AppError('Unknown style combination', 400);
+  }
+  if (logoComposition && !isLogoCompositionOption(logoComposition)) {
+    throw new AppError('Unknown logo type category', 400);
   }
 
   const profile = await getFreshProfileForMutation(input.sportOrSlug);
@@ -370,7 +384,23 @@ export async function addKnowledgeSample(input: {
   };
 
   let next: KnowledgeProfile;
-  if (comboId) {
+  if (logoComposition) {
+    const sets = [...(profile.logoSampleSets ?? [])];
+    const index = sets.findIndex((s) => s.composition === logoComposition);
+    if (index >= 0) {
+      sets[index] = {
+        ...sets[index],
+        samples: [...sets[index].samples, sample],
+      };
+    } else {
+      sets.push({ composition: logoComposition, samples: [sample] });
+    }
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      logoSampleSets: sets,
+      updatedAt: new Date().toISOString(),
+    });
+  } else if (comboId) {
     const sets = [...(profile.comboSampleSets ?? [])];
     const index = sets.findIndex((s) => s.comboId === comboId);
     if (index >= 0) {
@@ -413,6 +443,7 @@ export async function removeKnowledgeSample(
   const general = profile.sampleImages.find((s) => s.id === sampleId);
   let sample = general;
   let fromComboId: string | null = null;
+  let fromLogoComposition: string | null = null;
 
   if (!sample) {
     for (const set of profile.comboSampleSets ?? []) {
@@ -420,6 +451,17 @@ export async function removeKnowledgeSample(
       if (found) {
         sample = found;
         fromComboId = set.comboId;
+        break;
+      }
+    }
+  }
+
+  if (!sample) {
+    for (const set of profile.logoSampleSets ?? []) {
+      const found = set.samples.find((s) => s.id === sampleId);
+      if (found) {
+        sample = found;
+        fromLogoComposition = set.composition;
         break;
       }
     }
@@ -434,7 +476,20 @@ export async function removeKnowledgeSample(
   await unlink(path.join(SAMPLES_PUBLIC_DIR, profile.id, sample.filename)).catch(() => undefined);
 
   let next: KnowledgeProfile;
-  if (fromComboId) {
+  if (fromLogoComposition) {
+    const sets = (profile.logoSampleSets ?? [])
+      .map((set) =>
+        set.composition === fromLogoComposition
+          ? { ...set, samples: set.samples.filter((s) => s.id !== sampleId) }
+          : set,
+      )
+      .filter((set) => set.samples.length > 0);
+    next = knowledgeProfileSchema.parse({
+      ...profile,
+      logoSampleSets: sets,
+      updatedAt: new Date().toISOString(),
+    });
+  } else if (fromComboId) {
     const sets = (profile.comboSampleSets ?? [])
       .map((set) =>
         set.comboId === fromComboId
@@ -526,6 +581,56 @@ export function getComboSamples(
   comboId: string,
 ): KnowledgeSample[] {
   return profile.comboSampleSets?.find((s) => s.comboId === comboId)?.samples ?? [];
+}
+
+/**
+ * Prefer logo samples for the requested composition; fall back to any logo samples for the sport.
+ */
+export async function collectLogoReferenceSamples(
+  profile: KnowledgeProfile,
+  composition?: string | null,
+  max = 4,
+): Promise<{
+  samples: ResolvedSample[];
+  sampleCountForPrompt: number;
+  source: string;
+  composition: string | null;
+}> {
+  const key = (composition || '').trim() || null;
+  if (key) {
+    const matched = getLogoSamplesForComposition(profile, key);
+    if (matched.length > 0) {
+      const files = await resolveSamplesList(profile, matched);
+      if (files.length > 0) {
+        return {
+          samples: files.slice(0, max),
+          sampleCountForPrompt: files.length,
+          source: `${profile.id}:logo:${key}`,
+          composition: key,
+        };
+      }
+    }
+  }
+
+  const allLogoSamples = (profile.logoSampleSets ?? []).flatMap((s) => s.samples);
+  if (allLogoSamples.length > 0) {
+    const files = await resolveSamplesList(profile, allLogoSamples);
+    if (files.length > 0) {
+      return {
+        samples: files.slice(0, max),
+        sampleCountForPrompt: files.length,
+        source: `${profile.id}:logo:any`,
+        composition: key,
+      };
+    }
+  }
+
+  return {
+    samples: [],
+    sampleCountForPrompt: 0,
+    source: 'none',
+    composition: key,
+  };
 }
 
 /**

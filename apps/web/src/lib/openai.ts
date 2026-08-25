@@ -42,9 +42,13 @@ function extractImageDataUrl(image: {
   })();
 }
 
-export async function generateLogoImage(prompt: string): Promise<{
+export async function generateLogoImage(
+  prompt: string,
+  sampleFiles: SampleFile[] = [],
+): Promise<{
   dataUrl: string;
   model: string;
+  usedSamples: number;
 }> {
   if (!env.OPENAI_API_KEY) {
     throw new AppError('OPENAI_API_KEY is not configured', 503);
@@ -53,6 +57,38 @@ export async function generateLogoImage(prompt: string): Promise<{
   const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
   try {
+    const referenceFiles = sampleFiles.slice(0, 4);
+
+    if (referenceFiles.length > 0) {
+      const images = await Promise.all(
+        referenceFiles.map(async (sample) => {
+          const buffer =
+            sample.buffer || (sample.path ? await readFile(sample.path) : null);
+          if (!buffer) {
+            throw new AppError(`Logo sample file missing: ${sample.filename}`, 500);
+          }
+          return toFile(buffer, sample.filename, { type: sample.mimeType });
+        }),
+      );
+
+      const result = await openai.images.edit({
+        model: env.OPENAI_IMAGE_MODEL,
+        image: images,
+        prompt,
+        n: 1,
+        size: env.OPENAI_IMAGE_SIZE as '1024x1024',
+        input_fidelity: 'high',
+      });
+
+      const image = result.data?.[0];
+      if (!image) {
+        throw new AppError('OpenAI returned no logo image data', 502);
+      }
+
+      const parsed = await extractImageDataUrl(image);
+      return { ...parsed, usedSamples: referenceFiles.length };
+    }
+
     const result = await openai.images.generate({
       model: env.OPENAI_IMAGE_MODEL,
       prompt,
@@ -65,7 +101,8 @@ export async function generateLogoImage(prompt: string): Promise<{
       throw new AppError('OpenAI returned no logo image data', 502);
     }
 
-    return extractImageDataUrl(image);
+    const parsed = await extractImageDataUrl(image);
+    return { ...parsed, usedSamples: 0 };
   } catch (error) {
     if (error instanceof AppError) throw error;
 
