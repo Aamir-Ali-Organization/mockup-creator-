@@ -1,11 +1,12 @@
 import {
   LOGO_ATTACH_OPTION,
+  LOGO_COMPOSITION_WORDMARK,
   LOGO_CREATE_OPTION,
   resolveKnowledgeLayers,
   type AiPromptPayload,
   type KnowledgeProfile,
 } from '@mockup/shared';
-import { buildLogoCreationBriefLine } from '@/lib/logo-brief';
+import { buildLogoCreationBriefLine, buildLogoPlacementGuard } from '@/lib/logo-brief';
 
 export type QuotePromptInput = {
   teamName: string;
@@ -55,13 +56,23 @@ export function buildLogoPromptLine(
   payload: AiPromptPayload,
   teamName: string,
 ): string {
+  const composition = (payload.logoComposition || '').trim();
+  const placementGuard = buildLogoPlacementGuard(composition);
+
   if (payload.hasLogoFile) {
     return [
       `CUSTOMER LOGO ATTACHED: The first attached reference image is the official team logo for ${teamName}.`,
       'Reproduce that logo faithfully on the uniform (chest primary; optional sleeve/hat if natural).',
       'Keep logo colors, shapes, and proportions accurate. Do not invent a different mascot or replace the logo.',
+      placementGuard,
+      composition === LOGO_COMPOSITION_WORDMARK ||
+      composition.toLowerCase().includes('wordmark')
+        ? 'Style-sample jerseys may show mascots — IGNORE those mascots. Keep the chest branding as the attached wordmark text only.'
+        : '',
       'Do not treat style-sample uniforms as the logo source.',
-    ].join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
 
   if (payload.logoCreation === LOGO_CREATE_OPTION) {
@@ -84,7 +95,8 @@ export function buildLogoPromptLine(
     return [
       `LOGO CREATION REQUESTED for ${teamName}.`,
       brief,
-      'Invent a bold original Big Mad Drip logo from that brief and place it prominently on the chest.',
+      placementGuard ||
+        'Invent a bold original Big Mad Drip logo from that brief and place it prominently on the chest.',
       'Do not copy logos from style reference samples.',
     ]
       .filter(Boolean)

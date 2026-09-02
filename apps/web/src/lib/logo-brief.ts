@@ -1,5 +1,13 @@
 import type { AiPromptPayload, LogoPromptSettings } from '@mockup/shared';
-import { createDefaultLogoPromptSettings } from '@mockup/shared';
+import {
+  buildLogoCompositionGuard,
+  buildLogoOpenerSentence,
+  createDefaultLogoPromptSettings,
+  isStrictLogoComposition,
+  LOGO_COMPOSITION_WORDMARK,
+  logoCompositionNeedsIcon,
+  logoCompositionNeedsText,
+} from '@mockup/shared';
 
 export type LogoBrief = {
   teamName: string;
@@ -68,11 +76,16 @@ function briefVars(brief: LogoBrief): Record<string, string> {
   const icon = (brief.logoIcon || '').trim();
   const colors = resolveLogoPalette(brief);
   const notes = (brief.logoNotes || '').trim();
+  const needsText = logoCompositionNeedsText(composition);
+  const needsIcon = logoCompositionNeedsIcon(composition);
+  const compositionSentence = buildLogoCompositionGuard(composition);
 
   return {
     teamName: brief.teamName,
     sport: brief.sport,
     composition,
+    compositionSentence,
+    openerSentence: buildLogoOpenerSentence(composition, brief.teamName, brief.sport),
     vibe,
     text,
     icon,
@@ -81,15 +94,33 @@ function briefVars(brief: LogoBrief): Record<string, string> {
     primaryColor: brief.primaryColor,
     secondaryColor: brief.secondaryColor,
     alternateColor: (brief.alternateColor || '').trim(),
-    textSentence: text
-      ? `Lettering / text on the logo: "${text}". Keep typography sharp and readable at jersey size.`
-      : '',
-    iconSentence: icon ? `Icon / mascot concept: ${icon}.` : '',
+    textSentence: needsText
+      ? text
+        ? `Lettering / text on the logo: "${text}". Keep typography sharp and readable at jersey size.${
+            composition === LOGO_COMPOSITION_WORDMARK
+              ? ' Typography and letter effects ONLY — no pictorial mascot or icon of any kind.'
+              : ''
+          }`
+        : `Use "${brief.teamName}" as stylized wordmark lettering.${
+            composition === LOGO_COMPOSITION_WORDMARK
+              ? ' Typography only — no mascot or icon.'
+              : ''
+          }`
+      : 'Do not include team name lettering or slogan text.',
+    iconSentence:
+      needsIcon && icon
+        ? `Icon / mascot concept: ${icon}.`
+        : needsIcon
+          ? 'Create an original sport-relevant icon or mascot mark.'
+          : 'Do not include any icon, mascot, animal, character, face, claw, helmet-as-mascot, or pictorial symbol.',
     notesSentence: notes ? `Extra direction: ${notes}.` : '',
   };
 }
 
-/** Standalone OpenAI prompt to generate the logo image (step 1). */
+/**
+ * Prefer the filled sport template, but for strict types (wordmark / icon-only)
+ * always front-load the composition lock so older admin templates cannot bury it.
+ */
 export function buildStandaloneLogoPrompt(
   brief: LogoBrief,
   settings?: LogoPromptSettings | null,
@@ -97,21 +128,54 @@ export function buildStandaloneLogoPrompt(
   const logoSettings =
     settings?.promptTemplate?.trim() ? settings : createDefaultLogoPromptSettings();
 
-  const filled = fillTemplate(logoSettings.promptTemplate, briefVars(brief));
+  const vars = briefVars(brief);
+  const filled = fillTemplate(logoSettings.promptTemplate, vars);
   const instructions = (logoSettings.instructions || '').trim();
+  const guard = vars.compositionSentence;
+  const opener = vars.openerSentence;
 
-  return [instructions, filled].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  const body =
+    guard && !filled.includes(guard) ? `${filled} ${guard}` : filled;
+
+  // Image models weight early tokens heavily — put the lock first for wordmark/icon.
+  if (isStrictLogoComposition(vars.composition)) {
+    return [guard, opener, instructions, body, guard]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  return [instructions, body].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Short brief line injected into the uniform mockup prompt when creating a logo. */
 export function buildLogoCreationBriefLine(brief: LogoBrief): string {
+  const composition = (brief.logoComposition || '').trim();
   const parts = [
-    brief.logoComposition ? `type=${brief.logoComposition}` : null,
-    brief.logoText ? `text="${brief.logoText}"` : null,
-    brief.logoIcon ? `icon=${brief.logoIcon}` : null,
+    composition ? `type=${composition}` : null,
+    logoCompositionNeedsText(composition) && brief.logoText
+      ? `text="${brief.logoText}"`
+      : null,
+    logoCompositionNeedsIcon(composition) && brief.logoIcon ? `icon=${brief.logoIcon}` : null,
     brief.logoVibe ? `vibe=${brief.logoVibe}` : null,
     `colors=${resolveLogoPalette(brief)}`,
+    composition ? buildLogoCompositionGuard(composition) : null,
     brief.logoNotes ? `notes=${brief.logoNotes}` : null,
   ].filter(Boolean);
   return parts.length ? `Logo brief: ${parts.join('; ')}.` : '';
+}
+
+/** Reminder when placing an already-generated logo on the uniform (step 2). */
+export function buildLogoPlacementGuard(composition?: string | null): string {
+  const key = (composition || '').trim();
+  if (!key) return '';
+  if (key === LOGO_COMPOSITION_WORDMARK) {
+    return [
+      buildLogoCompositionGuard(key),
+      'The attached customer logo is TEXT/WORDMARK only.',
+      'Place that exact wordmark on the jersey. Do NOT invent or add a mascot from style-sample uniforms.',
+    ].join(' ');
+  }
+  return buildLogoCompositionGuard(key);
 }

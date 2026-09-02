@@ -1235,8 +1235,9 @@ export function KnowledgeAdminClient() {
                       placeholder="Create a single premium sports team logo for {{teamName}}…"
                     />
                     <p className="m-0 text-xs text-white/40">
-                      Use {'{{textSentence}}'}, {'{{iconSentence}}'}, and {'{{notesSentence}}'} for
-                      optional lines that auto-hide when empty.
+                      Use {'{{openerSentence}}'}, {'{{compositionSentence}}'}, {'{{textSentence}}'},
+                      {'{{iconSentence}}'}, and {'{{notesSentence}}'} — composition locks prevent
+                      wordmark-only from getting mascots.
                     </p>
                   </label>
 
@@ -1247,7 +1248,8 @@ export function KnowledgeAdminClient() {
                       </h4>
                       <p className="mt-1 text-sm text-white/45">
                         Upload example logos for each form category. When a lead picks that logo
-                        type, these images guide the free logo AI.
+                        type, these images guide the free logo AI. For Wordmark only / Icon only,
+                        mismatched samples are never used as fallback.
                       </p>
                     </div>
 

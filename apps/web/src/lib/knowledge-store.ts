@@ -8,6 +8,7 @@ import {
   getLogoSamplesForComposition,
   getStyleComboById,
   isLogoCompositionOption,
+  isStrictLogoComposition,
   knowledgeProfileSchema,
   resolveStyleComboId,
   sportToSlug,
@@ -609,6 +610,16 @@ export async function collectLogoReferenceSamples(
           composition: key,
         };
       }
+    }
+
+    // Wordmark-only / icon-only must not fall back to mismatched reference logos (e.g. mascots).
+    if (isStrictLogoComposition(key)) {
+      return {
+        samples: [],
+        sampleCountForPrompt: 0,
+        source: `${profile.id}:logo:none-strict`,
+        composition: key,
+      };
     }
   }
 

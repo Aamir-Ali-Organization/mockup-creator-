@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOGO_CREATE_OPTION } from '@mockup/shared';
+import { buildLogoReferencePromptSuffix, LOGO_CREATE_OPTION } from '@mockup/shared';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
@@ -242,10 +242,12 @@ export async function POST(request: Request) {
         job.logoComposition,
         4,
       );
-      const logoPromptWithRefs =
-        logoRefs.sampleCountForPrompt > 0
-          ? `${logoPrompt} Reference logo sample images are attached (${logoRefs.sampleCountForPrompt}). Match their quality, composition style, and production clarity only — create a NEW original logo for ${job.teamName}. Do not copy text, mascots, or marks from the samples.`
-          : logoPrompt;
+      const refSuffix = buildLogoReferencePromptSuffix(
+        job.logoComposition || '',
+        job.teamName,
+        logoRefs.sampleCountForPrompt,
+      );
+      const logoPromptWithRefs = refSuffix ? `${logoPrompt} ${refSuffix}` : logoPrompt;
 
       console.info(
         '[mockups/generate] step1 logo for',

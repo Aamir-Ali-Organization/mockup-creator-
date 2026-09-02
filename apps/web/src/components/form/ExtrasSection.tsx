@@ -48,7 +48,10 @@ export function ExtrasSection() {
   } = useFormContext();
 
   const [accessoriesOpen, setAccessoriesOpen] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
   const accessories = (useWatch({ control, name: 'accessories' }) || []) as Accessory[];
+  const rosterInfo = (useWatch({ control, name: 'rosterInfo' }) || '') as string;
+  const rosterFile = useWatch({ control, name: 'rosterFile' }) as FileList | null | undefined;
   const logoCreation = (useWatch({ control, name: 'logoCreation' }) || '') as string;
   const logoComposition = (useWatch({ control, name: 'logoComposition' }) || '') as string;
   const logoColorSource = (useWatch({ control, name: 'logoColorSource' }) || '') as string;
@@ -68,6 +71,10 @@ export function ExtrasSection() {
     secondary: logoSecondaryColor,
     alternate: logoAlternateColor,
   };
+
+  const rosterFileName = rosterFile?.[0]?.name || '';
+  const hasRosterNotes = Boolean(rosterInfo.trim());
+  const hasRoster = hasRosterNotes || Boolean(rosterFileName);
 
   useEffect(() => {
     if (!needsLogoUpload) {
@@ -94,10 +101,29 @@ export function ExtrasSection() {
     }
   }, [needsLogoBrief, teamName, getValues, setValue]);
 
+  // Clear icon/text fields that do not apply to the selected composition.
   useEffect(() => {
-    if (!accessoriesOpen) return;
+    if (!needsLogoBrief || !logoComposition) return;
+    if (!logoCompositionNeedsIcon(logoComposition)) {
+      setValue('logoIcon', '', { shouldValidate: false });
+    }
+    if (!logoCompositionNeedsText(logoComposition)) {
+      setValue('logoText', '', { shouldValidate: false });
+    } else {
+      const currentText = String(getValues('logoText') || '').trim();
+      if (!currentText && teamName) {
+        setValue('logoText', teamName, { shouldValidate: false, shouldDirty: false });
+      }
+    }
+  }, [needsLogoBrief, logoComposition, teamName, getValues, setValue]);
+
+  useEffect(() => {
+    if (!accessoriesOpen && !rosterOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAccessoriesOpen(false);
+      if (event.key === 'Escape') {
+        setAccessoriesOpen(false);
+        setRosterOpen(false);
+      }
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -106,7 +132,7 @@ export function ExtrasSection() {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [accessoriesOpen]);
+  }, [accessoriesOpen, rosterOpen]);
 
   const toggleAccessory = (item: Accessory, checked: boolean) => {
     const next = checked
@@ -117,6 +143,11 @@ export function ExtrasSection() {
 
   const clearAccessories = () => {
     setValue('accessories', [], { shouldDirty: true, shouldValidate: true });
+  };
+
+  const clearRoster = () => {
+    setValue('rosterInfo', '', { shouldDirty: true, shouldValidate: true });
+    setValue('rosterFile', undefined, { shouldDirty: true, shouldValidate: true });
   };
 
   return (
@@ -161,35 +192,46 @@ export function ExtrasSection() {
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
-        <div className="mb-3">
-          <h3 className="m-0 font-display text-2xl tracking-wide text-white">Roster</h3>
-          <p className="mt-1 text-sm text-white/45">
-            Add notes and/or attach a roster file — whichever is easiest.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="m-0 font-display text-2xl tracking-wide text-white">Roster</h3>
+            <p className="mt-1 text-sm text-white/45">Optional — notes and/or a roster file</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRosterOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white transition hover:border-accent/50 hover:text-accent"
+          >
+            {hasRoster ? 'Edit roster' : 'Add roster'}
+          </button>
         </div>
-        <div className="space-y-3">
-          <TextAreaField
-            label="Roster notes"
-            placeholder="Names, numbers, sizes…"
-            {...register('rosterInfo')}
-          />
-          <Controller
-            name="rosterFile"
-            control={control}
-            render={({ field }) => (
-              <FileField
-                label="Attach roster file"
-                name={field.name}
-                accept=".png,.jpg,.jpeg,.pdf,.docx,.csv,.xlsx,.xls"
-                value={field.value}
-                onBlur={field.onBlur}
-                onChange={(event) => field.onChange(event.target.files)}
-                ref={field.ref}
-                error={errors.rosterFile?.message as string | undefined}
-              />
-            )}
-          />
-        </div>
+
+        {hasRoster ? (
+          <div className="mt-3 space-y-2">
+            {hasRosterNotes ? (
+              <p className="mb-0 line-clamp-3 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2 text-sm text-accent">
+                {rosterInfo.trim()}
+              </p>
+            ) : null}
+            {rosterFileName ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/35 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
+                {rosterFileName}
+                <button
+                  type="button"
+                  aria-label="Remove roster file"
+                  onClick={() =>
+                    setValue('rosterFile', undefined, { shouldDirty: true, shouldValidate: true })
+                  }
+                  className="rounded-full px-1 text-accent/80 hover:bg-accent/20 hover:text-accent"
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mb-0 mt-3 text-sm text-white/35">No roster added</p>
+        )}
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">
@@ -478,6 +520,83 @@ export function ExtrasSection() {
                 className="btn-primary px-5 py-2.5 text-lg"
               >
                 Save accessories
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {rosterOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center"
+          onClick={() => setRosterOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add roster"
+            className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141418] shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shrink-0 flex items-start justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
+              <div>
+                <p className="m-0 text-[0.7rem] font-bold uppercase tracking-[0.14em] text-accent">
+                  Optional
+                </p>
+                <h3 className="mt-1 font-display text-3xl tracking-wide text-white">Roster</h3>
+                <p className="mt-1 text-sm text-white/50">
+                  Add notes and/or attach a roster file — whichever is easiest.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRosterOpen(false)}
+                className="rounded-full border border-white/15 px-3 py-1.5 text-sm font-semibold text-white/70 transition hover:border-white/35 hover:text-white"
+              >
+                Done
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-5 [-webkit-overflow-scrolling:touch]">
+              <TextAreaField
+                label="Roster notes"
+                placeholder="Names, numbers, sizes…"
+                {...register('rosterInfo')}
+              />
+              <Controller
+                name="rosterFile"
+                control={control}
+                render={({ field }) => (
+                  <FileField
+                    label="Attach roster file"
+                    name={field.name}
+                    accept=".png,.jpg,.jpeg,.pdf,.docx,.csv,.xlsx,.xls"
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onChange={(event) => field.onChange(event.target.files)}
+                    ref={field.ref}
+                    error={errors.rosterFile?.message as string | undefined}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="shrink-0 flex items-center justify-between gap-3 border-t border-white/10 p-4 sm:p-5">
+              <button
+                type="button"
+                onClick={clearRoster}
+                disabled={!hasRoster}
+                className="text-sm font-semibold text-white/45 transition hover:text-white disabled:opacity-40"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setRosterOpen(false)}
+                className="btn-primary px-5 py-2.5 text-lg"
+              >
+                Save roster
               </button>
             </div>
           </div>

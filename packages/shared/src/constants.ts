@@ -68,6 +68,13 @@ export const LOGO_COMPOSITION_OPTIONS = [
   'Badge / shield emblem',
 ] as const;
 
+export {
+  LOGO_COMPOSITION_WORDMARK,
+  LOGO_COMPOSITION_ICON,
+  LOGO_COMPOSITION_COMBINED,
+  LOGO_COMPOSITION_BADGE,
+} from './logo-knowledge.js';
+
 export const LOGO_VIBE_OPTIONS = [
   'Bold & aggressive',
   'Clean & modern',
@@ -81,11 +88,11 @@ export const LOGO_COLOR_SOURCE_OPTIONS = [
 ] as const;
 
 export function logoCompositionNeedsIcon(composition: string) {
-  return composition !== 'Wordmark only (text)';
+  return composition !== LOGO_COMPOSITION_OPTIONS[0];
 }
 
 export function logoCompositionNeedsText(composition: string) {
-  return composition !== 'Icon / mascot only';
+  return composition !== LOGO_COMPOSITION_OPTIONS[1];
 }
 
 export const ACCESSORY_GROUPS = [
