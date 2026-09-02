@@ -22,6 +22,24 @@ const envSchema = z.object({
   KNOWLEDGE_ADMIN_SECRET: z.string().optional().default(''),
   /** Vercel Blob token — required for persistent submissions on Vercel. */
   BLOB_READ_WRITE_TOKEN: z.string().optional().default(''),
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  STRIPE_PRICE_ID: z.string().optional().default(''),
+  STRIPE_MOCKUP_AMOUNT_CENTS: z
+    .string()
+    .optional()
+    .default('1500')
+    .transform((value) => {
+      const n = Number.parseInt(value, 10);
+      return Number.isFinite(n) && n > 0 ? n : 1500;
+    }),
+  NEXT_PUBLIC_APP_URL: z.string().optional().default(''),
+  /** When true (default), one free mockup per client IP. Set to "false" to disable. */
+  IP_FREE_MOCKUP_LIMIT: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((value) => value !== 'false'),
 });
 
 export const env = envSchema.parse({
@@ -39,4 +57,10 @@ export const env = envSchema.parse({
   KNOWLEDGE_ADMIN_PASSWORD: process.env.KNOWLEDGE_ADMIN_PASSWORD,
   KNOWLEDGE_ADMIN_SECRET: process.env.KNOWLEDGE_ADMIN_SECRET,
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
+  STRIPE_MOCKUP_AMOUNT_CENTS: process.env.STRIPE_MOCKUP_AMOUNT_CENTS,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  IP_FREE_MOCKUP_LIMIT: process.env.IP_FREE_MOCKUP_LIMIT,
 });

@@ -1,8 +1,14 @@
 import { z } from 'zod';
 import { buildLogoReferencePromptSuffix, LOGO_CREATE_OPTION } from '@mockup/shared';
+import { getClientIp } from '@/lib/client-ip';
 import { env } from '@/lib/env';
 import { AppError, toErrorResponse } from '@/lib/errors';
 import { isGhlReady, markMockupGeneratedInGhl } from '@/lib/ghl';
+import {
+  canGenerateNewMockup,
+  consumePaidEntitlement,
+  markFreeMockupUsed,
+} from '@/lib/mockup-quota';
 import { buildStandaloneLogoPrompt } from '@/lib/logo-brief';
 import {
   canGenerateMockups,
@@ -27,6 +33,7 @@ const bodySchema = z.object({
   contactId: z.string().optional().nullable(),
   fleadid: z.string().optional().nullable(),
   submissionId: z.string().optional().nullable(),
+  paymentSessionId: z.string().optional().nullable(),
   force: z.boolean().optional().default(false),
   job: z.object({
     customerName: z.string(),
@@ -121,7 +128,7 @@ export async function POST(request: Request) {
       throw new AppError('Invalid generate payload', 400, parsed.error.flatten());
     }
 
-    const { job, contactId, fleadid, force } = parsed.data;
+    const { job, contactId, fleadid, force, paymentSessionId } = parsed.data;
     submissionId = parsed.data.submissionId ?? null;
 
     // Refresh / revisit: return the already-saved free mockup instead of regenerating.
@@ -173,15 +180,26 @@ export async function POST(request: Request) {
             contactId: existing.contactId || contactId,
           }).catch(() => undefined);
         }
-        return Response.json({
-          success: true,
-          skipped: true,
-          message: 'Mockup already generated for this lead',
-          contactId: existing.contactId,
-          submissionId,
-          imageDataUrl: undefined,
-        });
+
+        // Already generated, no cache, no payment → paywall (force alone does not bypass).
+        if (!paymentSessionId?.trim()) {
+          throw new AppError(
+            'A free mockup was already generated for this lead. Pay to create another.',
+            402,
+            { requiresPayment: true },
+          );
+        }
+        // Paid session present — fall through to generate another mockup.
       }
+    }
+
+    const ip = getClientIp(request);
+    const quota = await canGenerateNewMockup({
+      ip,
+      paymentSessionId,
+    });
+    if (!quota.ok) {
+      throw new AppError(quota.reason, 402, { requiresPayment: true });
     }
 
     if (!canGenerateMockups()) {
@@ -377,6 +395,31 @@ export async function POST(request: Request) {
       }
     }
 
+    let paidCreditsRemaining: number | null = null;
+    let paidCreditsTotal: number | null = null;
+
+    if (quota.mode === 'paid' && paymentSessionId?.trim()) {
+      const consumed = await consumePaidEntitlement(paymentSessionId.trim(), {
+        submissionId,
+        contactId,
+      }).catch((error) => {
+        console.error('[mockups/generate] failed to consume paid entitlement:', error);
+        return null;
+      });
+      if (consumed) {
+        paidCreditsRemaining = consumed.quantityRemaining ?? 0;
+        paidCreditsTotal = consumed.quantityTotal ?? 1;
+      }
+    } else if (quota.mode === 'free') {
+      await markFreeMockupUsed({
+        ip,
+        submissionId,
+        contactId,
+      }).catch((error) => {
+        console.error('[mockups/generate] failed to mark free mockup used:', error);
+      });
+    }
+
     return Response.json({
       success: true,
       skipped: false,
@@ -394,6 +437,8 @@ export async function POST(request: Request) {
       logoDataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
       ghlWarning,
+      paidCreditsRemaining,
+      paidCreditsTotal,
     });
   } catch (error) {
     if (submissionId) {

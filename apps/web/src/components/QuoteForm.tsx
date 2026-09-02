@@ -187,6 +187,8 @@ export function QuoteForm() {
         submissionId: data.submissionId ?? null,
         skipMockup: data.skipMockup,
         shouldGenerate: data.shouldGenerate,
+        requiresPayment: data.requiresPayment,
+        freeQuotaUsed: data.freeQuotaUsed,
         job: data.job,
       });
       // Success is always tied to the GHL contact id for future mockup URL storage.

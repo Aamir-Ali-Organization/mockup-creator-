@@ -12,8 +12,17 @@ export class AppError extends Error {
 
 export function toErrorResponse(error: unknown) {
   if (error instanceof AppError) {
+    const details =
+      error.details && typeof error.details === 'object' && !Array.isArray(error.details)
+        ? (error.details as Record<string, unknown>)
+        : undefined;
     return Response.json(
-      { success: false, message: error.message, details: error.details },
+      {
+        success: false,
+        message: error.message,
+        details: error.details,
+        ...(details?.requiresPayment ? { requiresPayment: true } : {}),
+      },
       { status: error.statusCode },
     );
   }

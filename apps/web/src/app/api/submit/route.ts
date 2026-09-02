@@ -1,7 +1,9 @@
 import { createQuoteBodySchema, LOGO_ATTACH_OPTION } from '@mockup/shared';
+import { getClientIp } from '@/lib/client-ip';
 import { env } from '@/lib/env';
 import { toErrorResponse, AppError } from '@/lib/errors';
 import { isGhlReady, resolveLeadByFleadid, upsertLeadInGhl } from '@/lib/ghl';
+import { hasUsedFreeMockup } from '@/lib/mockup-quota';
 import { canGenerateMockups } from '@/lib/openai';
 import { buildPromptFromQuoteWithKnowledge } from '@/lib/prompt-builder';
 import { createSubmission, saveSubmissionLogo } from '@/lib/submission-store';
@@ -75,6 +77,13 @@ export async function POST(request: Request) {
     if (fleadid && isGhlReady()) {
       const existing = await resolveLeadByFleadid(fleadid);
       skipMockup = existing.mockupAlreadyGenerated;
+    }
+
+    const ip = getClientIp(request);
+    const freeQuotaUsed = await hasUsedFreeMockup(ip);
+    // GHL already generated OR free IP used → don't auto-generate free mockup.
+    if (!skipMockup && freeQuotaUsed) {
+      skipMockup = true;
     }
 
     const { prompt, payload, profile } = await buildPromptFromQuoteWithKnowledge({
@@ -194,6 +203,8 @@ export async function POST(request: Request) {
       fleadid,
       submissionId,
       skipMockup,
+      requiresPayment: Boolean(skipMockup),
+      freeQuotaUsed,
       shouldGenerate:
         !skipMockup && env.AUTO_GENERATE_MOCKUP && canGenerateMockups(),
       promptPreview: prompt,

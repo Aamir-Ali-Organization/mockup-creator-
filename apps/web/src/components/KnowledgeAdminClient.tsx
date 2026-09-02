@@ -30,6 +30,7 @@ type ProfileSummary = {
 };
 
 type EditorTab = 'looks' | 'defaults';
+type AdminView = 'sports' | 'billing';
 
 const TABS: Array<{ id: EditorTab; label: string }> = [
   { id: 'looks', label: 'Looks' },
@@ -148,6 +149,8 @@ export function KnowledgeAdminClient() {
   const [error, setError] = useState<string | null>(null);
   const [sportQuery, setSportQuery] = useState('');
   const [tab, setTab] = useState<EditorTab>('looks');
+  const [adminView, setAdminView] = useState<AdminView>('sports');
+  const [priceUsdInput, setPriceUsdInput] = useState('15');
   const [dragOver, setDragOver] = useState(false);
   const [selectedComboId, setSelectedComboId] = useState<string>(
     STYLE_COMBO_DEFINITIONS[0]?.id ?? '',
@@ -274,7 +277,7 @@ export function KnowledgeAdminClient() {
 
   const detailQuery = useQuery({
     queryKey: ['knowledge-profile', selectedSport?.id],
-    enabled: Boolean(user && selectedSport?.id),
+    enabled: Boolean(user && selectedSport?.id && adminView === 'sports'),
     queryFn: async () => {
       const res = await fetch(`/api/knowledge/${selectedSport!.id}`, {
         credentials: 'include',
@@ -282,6 +285,54 @@ export function KnowledgeAdminClient() {
       const data = await readJson<{ profile: KnowledgeProfile }>(res);
       return data.profile;
     },
+  });
+
+  const billingQuery = useQuery({
+    queryKey: ['billing-settings'],
+    enabled: Boolean(user && adminView === 'billing'),
+    queryFn: async () => {
+      const res = await fetch('/api/billing/settings', { credentials: 'include' });
+      return readJson<{
+        settings: {
+          extraMockupPriceCents: number;
+          extraMockupPriceUsd: number;
+          extraMockupPriceLabel: string;
+          updatedAt: string;
+        };
+      }>(res);
+    },
+  });
+
+  useEffect(() => {
+    if (!billingQuery.data?.settings) return;
+    const usd = billingQuery.data.settings.extraMockupPriceUsd;
+    setPriceUsdInput(Number.isInteger(usd) ? String(usd) : usd.toFixed(2));
+  }, [billingQuery.data]);
+
+  const billingSaveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/billing/settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extraMockupPriceUsd: priceUsdInput }),
+      });
+      return readJson<{
+        settings: {
+          extraMockupPriceCents: number;
+          extraMockupPriceUsd: number;
+          extraMockupPriceLabel: string;
+          updatedAt: string;
+        };
+      }>(res);
+    },
+    onSuccess: (data) => {
+      const usd = data.settings.extraMockupPriceUsd;
+      setPriceUsdInput(Number.isInteger(usd) ? String(usd) : usd.toFixed(2));
+      showToast(`Extra mockup price set to ${data.settings.extraMockupPriceLabel}`);
+      void queryClient.invalidateQueries({ queryKey: ['billing-settings'] });
+    },
+    onError: (err: Error) => showToast(err.message, 'err'),
   });
 
   useEffect(() => {
@@ -552,19 +603,30 @@ export function KnowledgeAdminClient() {
             <Link href="/admin/submissions" className="btn-ghost !px-3 !py-2 text-xs">
               Submissions
             </Link>
-            {isDirty && (
+            {adminView === 'sports' && isDirty && (
               <span className="hidden rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent sm:inline">
                 Unsaved changes
               </span>
             )}
-            <button
-              type="button"
-              className="btn-primary !px-5 !py-2.5 !text-lg"
-              disabled={!draft || !isDirty || saveMutation.isPending}
-              onClick={() => saveMutation.mutate()}
-            >
-              {saveMutation.isPending ? 'Saving…' : 'Save'}
-            </button>
+            {adminView === 'sports' ? (
+              <button
+                type="button"
+                className="btn-primary !px-5 !py-2.5 !text-lg"
+                disabled={!draft || !isDirty || saveMutation.isPending}
+                onClick={() => saveMutation.mutate()}
+              >
+                {saveMutation.isPending ? 'Saving…' : 'Save'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary !px-5 !py-2.5 !text-lg"
+                disabled={billingSaveMutation.isPending}
+                onClick={() => billingSaveMutation.mutate()}
+              >
+                {billingSaveMutation.isPending ? 'Saving…' : 'Save price'}
+              </button>
+            )}
             <div className="hidden h-8 w-px bg-white/10 sm:block" />
             <div className="hidden items-center gap-2 sm:flex">
               <span className="max-w-[160px] truncate text-xs text-white/45">{user}</span>
@@ -585,6 +647,33 @@ export function KnowledgeAdminClient() {
         {/* Sidebar */}
         <aside className="border-b border-white/10 lg:min-h-[calc(100vh-73px)] lg:border-b-0 lg:border-r">
           <div className="sticky top-[73px] space-y-3 p-4 sm:p-5">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                  adminView === 'sports'
+                    ? 'bg-accent/15 text-accent'
+                    : 'bg-white/[0.04] text-white/50 hover:text-white/80'
+                }`}
+                onClick={() => setAdminView('sports')}
+              >
+                Sports
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                  adminView === 'billing'
+                    ? 'bg-accent/15 text-accent'
+                    : 'bg-white/[0.04] text-white/50 hover:text-white/80'
+                }`}
+                onClick={() => setAdminView('billing')}
+              >
+                Pricing
+              </button>
+            </div>
+
+            {adminView === 'sports' ? (
+            <>
             <div>
               <p className="field-label mb-2">Sport</p>
               {filteredSports.length > 1 ? (
@@ -655,6 +744,12 @@ export function KnowledgeAdminClient() {
                 );
               })}
             </div>
+            </>
+            ) : (
+              <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm leading-relaxed text-white/55">
+                Set the unit price charged for each extra AI mockup after the free one.
+              </p>
+            )}
 
             <button
               type="button"
@@ -668,7 +763,76 @@ export function KnowledgeAdminClient() {
 
         {/* Editor */}
         <main className="min-w-0 p-4 sm:p-6 lg:p-8">
-          {listQuery.isError ? (
+          {adminView === 'billing' ? (
+            <div className="mx-auto max-w-xl animate-[fadeUp_0.35s_ease-out] space-y-6">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
+                  Billing
+                </p>
+                <h2 className="mt-2 font-display text-4xl tracking-wide text-white">
+                  Extra mockup price
+                </h2>
+                <p className="mt-2 text-sm text-white/55">
+                  First mockup stays free. This price is charged per extra mockup when customers
+                  unlock more (they can pick quantity at checkout).
+                </p>
+              </div>
+
+              {billingQuery.isLoading ? (
+                <p className="text-sm text-white/45">Loading price…</p>
+              ) : null}
+              {billingQuery.isError ? (
+                <p className="rounded-lg border border-heat/30 bg-heat/10 px-3 py-2 text-sm text-red-200">
+                  {billingQuery.error instanceof Error
+                    ? billingQuery.error.message
+                    : 'Failed to load billing settings'}
+                </p>
+              ) : null}
+
+              <label className="block space-y-1.5">
+                <span className="field-label">Price per extra mockup (USD)</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/45">
+                    $
+                  </span>
+                  <input
+                    className="input-field !pl-8"
+                    type="number"
+                    min={0.5}
+                    step={0.01}
+                    value={priceUsdInput}
+                    onChange={(e) => setPriceUsdInput(e.target.value)}
+                    placeholder="15.00"
+                  />
+                </div>
+              </label>
+
+              <p className="text-sm text-white/50">
+                Current:{' '}
+                <span className="font-semibold text-white">
+                  {billingQuery.data?.settings.extraMockupPriceLabel ?? '—'}
+                </span>
+                {billingQuery.data?.settings.updatedAt &&
+                new Date(billingQuery.data.settings.updatedAt).getTime() > 0 ? (
+                  <span className="text-white/35">
+                    {' '}
+                    · updated {relativeTime(billingQuery.data.settings.updatedAt)}
+                  </span>
+                ) : (
+                  <span className="text-white/35"> · using default / env until saved</span>
+                )}
+              </p>
+
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={billingSaveMutation.isPending}
+                onClick={() => billingSaveMutation.mutate()}
+              >
+                {billingSaveMutation.isPending ? 'Saving…' : 'Save price'}
+              </button>
+            </div>
+          ) : listQuery.isError ? (
             <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
               <p className="text-red-200">Couldn’t load knowledge profiles.</p>
               <p className="max-w-md text-sm text-white/45">
