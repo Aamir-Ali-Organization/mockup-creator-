@@ -11,6 +11,8 @@ import {
   generateMockup,
   isPaymentRequiredError,
   loadMockupSession,
+  resolveMockupImageSrc,
+  resolveMockupLogoSrc,
   saveMockupSession,
   type MockupSession,
   type PricingInfo,
@@ -138,12 +140,12 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
       job: current.job,
       force: true,
     });
-    if (!result.imageDataUrl) {
+    if (!result.imageDataUrl && !result.imageUrl) {
       throw new Error('Mockup generated but no image was returned.');
     }
     pushGallery({
-      imageDataUrl: result.imageDataUrl,
-      logoDataUrl: result.logoDataUrl,
+      imageDataUrl: resolveMockupImageSrc(result)!,
+      logoDataUrl: resolveMockupLogoSrc(result),
     });
     markSessionGenerated(current, result.submissionId);
     setCreditsRemaining(result.paidCreditsRemaining ?? 0);
@@ -228,10 +230,10 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
         job: merged.job,
       })
         .then((result) => {
-          if (result.imageDataUrl) {
+          if (result.imageDataUrl || result.imageUrl) {
             pushGallery({
-              imageDataUrl: result.imageDataUrl,
-              logoDataUrl: result.logoDataUrl,
+              imageDataUrl: resolveMockupImageSrc(result)!,
+              logoDataUrl: resolveMockupLogoSrc(result),
             });
             markSessionGenerated(merged, result.submissionId);
             setPhase('ready');
@@ -258,10 +260,10 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
       job: merged.job,
     })
       .then((result) => {
-        if (result.imageDataUrl) {
+        if (result.imageDataUrl || result.imageUrl) {
           pushGallery({
-            imageDataUrl: result.imageDataUrl,
-            logoDataUrl: result.logoDataUrl,
+            imageDataUrl: resolveMockupImageSrc(result)!,
+            logoDataUrl: resolveMockupLogoSrc(result),
           });
           markSessionGenerated(merged, result.submissionId);
           setPhase('ready');
@@ -301,10 +303,10 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
           job: session.job,
           force: false,
         });
-        if (result.imageDataUrl) {
+        if (result.imageDataUrl || result.imageUrl) {
           pushGallery({
-            imageDataUrl: result.imageDataUrl,
-            logoDataUrl: result.logoDataUrl,
+            imageDataUrl: resolveMockupImageSrc(result)!,
+            logoDataUrl: resolveMockupLogoSrc(result),
           });
           markSessionGenerated(session, result.submissionId);
           setPhase('ready');
@@ -595,22 +597,11 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
           ) : null}
         </div>
 
-        {phase === 'loading-session' || phase === 'generating' ? (
-          <div className="mt-8 flex justify-center">
-            <a href="tel:2398391588" className="btn-primary w-full max-w-xs sm:w-auto">
-              Call Matt Now
-            </a>
-          </div>
-        ) : (
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a href="tel:2398391588" className="btn-primary w-full sm:w-auto">
-              Call Matt Now
-            </a>
-            <Link href="/" className="btn-ghost w-full sm:w-auto">
-              Submit another quote
-            </Link>
-          </div>
-        )}
+        <div className="mt-8 flex justify-center">
+          <a href="tel:2398391588" className="btn-primary w-full max-w-xs sm:w-auto">
+            Call Matt Now
+          </a>
+        </div>
       </div>
     </div>
   );

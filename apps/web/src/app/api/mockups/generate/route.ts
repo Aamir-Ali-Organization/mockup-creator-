@@ -77,13 +77,17 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } 
   };
 }
 
-function bufferToDataUrl(buffer: Buffer, mimeType: string): string {
-  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+function previewUrls(submissionId: string, bust?: string | number) {
+  const q = bust != null ? `?v=${encodeURIComponent(String(bust))}` : '';
+  return {
+    imageUrl: `/api/mockups/preview/${encodeURIComponent(submissionId)}/image${q}`,
+    logoUrl: `/api/mockups/preview/${encodeURIComponent(submissionId)}/logo${q}`,
+  };
 }
 
 async function loadCachedMockupResult(submissionId: string): Promise<{
-  imageDataUrl: string;
-  logoDataUrl?: string;
+  imageUrl: string;
+  logoUrl?: string;
 } | null> {
   try {
     const existing = await getSubmission(submissionId);
@@ -91,28 +95,13 @@ async function loadCachedMockupResult(submissionId: string): Promise<{
 
     const image = await readSubmissionImage(submissionId);
     if (!image) return null;
+    if (!image.redirectUrl && image.buffer.length === 0) return null;
 
-    let imageDataUrl: string | null = null;
-    if (image.redirectUrl) {
-      const response = await fetch(image.redirectUrl);
-      if (!response.ok) return null;
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const contentType = response.headers.get('content-type') || image.contentType || 'image/png';
-      imageDataUrl = bufferToDataUrl(bytes, contentType);
-    } else if (image.buffer.length > 0) {
-      imageDataUrl = bufferToDataUrl(image.buffer, image.contentType || 'image/png');
-    }
-    if (!imageDataUrl) return null;
-
-    let logoDataUrl: string | undefined;
-    if (existing.hasLogo) {
-      const logo = await readSubmissionLogo(submissionId);
-      if (logo) {
-        logoDataUrl = bufferToDataUrl(logo.buffer, logo.mimeType || 'image/png');
-      }
-    }
-
-    return { imageDataUrl, logoDataUrl };
+    const urls = previewUrls(submissionId, existing.updatedAt);
+    return {
+      imageUrl: existing.imageUrl || urls.imageUrl,
+      logoUrl: existing.hasLogo ? urls.logoUrl : undefined,
+    };
   } catch {
     return null;
   }
@@ -144,8 +133,8 @@ export async function POST(request: Request) {
           contactId,
           fleadid,
           submissionId,
-          imageDataUrl: cached.imageDataUrl,
-          logoDataUrl: cached.logoDataUrl,
+          imageUrl: cached.imageUrl,
+          logoUrl: cached.logoUrl,
         });
       }
     }
@@ -169,8 +158,8 @@ export async function POST(request: Request) {
               contactId: existing.contactId || contactId,
               fleadid,
               submissionId,
-              imageDataUrl: cached.imageDataUrl,
-              logoDataUrl: cached.logoDataUrl,
+              imageUrl: cached.imageUrl,
+              logoUrl: cached.logoUrl,
             });
           }
 
@@ -212,7 +201,6 @@ export async function POST(request: Request) {
       filename: string;
       mimeType: string;
     } | null = null;
-    let logoDataUrl: string | undefined;
     let logoPrompt: string | null = null;
 
     if (submissionId) {
@@ -276,7 +264,6 @@ export async function POST(request: Request) {
         logoRefs.source,
       );
       const logoImage = await generateLogoImage(logoPromptWithRefs, logoRefs.samples);
-      logoDataUrl = logoImage.dataUrl;
       const parsedLogo = dataUrlToBuffer(logoImage.dataUrl);
       logoForOpenAi = {
         buffer: parsedLogo.buffer,
@@ -420,6 +407,8 @@ export async function POST(request: Request) {
       });
     }
 
+    const preview = submissionId ? previewUrls(submissionId, Date.now()) : null;
+
     return Response.json({
       success: true,
       skipped: false,
@@ -427,14 +416,13 @@ export async function POST(request: Request) {
       fleadid,
       submissionId,
       model: image.model,
-      prompt,
-      logoPrompt,
-      payload,
       knowledgeProfileId: profile.id,
       usedSamples: image.usedSamples,
       usedLogo: image.usedLogo,
-      imageDataUrl: image.dataUrl,
-      logoDataUrl,
+      imageUrl: preview?.imageUrl,
+      logoUrl: preview && hasLogoFile ? preview.logoUrl : undefined,
+      // Fallback only when there is no submission to preview from.
+      imageDataUrl: preview ? undefined : image.dataUrl,
       autoGenerate: env.AUTO_GENERATE_MOCKUP,
       ghlWarning,
       paidCreditsRemaining,

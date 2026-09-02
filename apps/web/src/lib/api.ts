@@ -70,6 +70,10 @@ export type GenerateResult = {
   contactId?: string | null;
   fleadid?: string | null;
   submissionId?: string | null;
+  /** Preferred: lightweight URL to saved mockup (avoids huge JSON). */
+  imageUrl?: string;
+  logoUrl?: string;
+  /** Legacy/fallback inline image when no submission preview exists. */
   imageDataUrl?: string;
   logoDataUrl?: string;
   model?: string;
@@ -256,14 +260,41 @@ export async function generateMockup(payload: {
     body: JSON.stringify(payload),
   });
 
+  const raw = await response.text();
+  let data: GenerateResult & { message?: string; requiresPayment?: boolean };
+  try {
+    data = JSON.parse(raw) as GenerateResult & {
+      message?: string;
+      requiresPayment?: boolean;
+    };
+  } catch {
+    throw new ApiError(
+      response.ok
+        ? 'Mockup response was truncated. Please retry.'
+        : `Request failed (${response.status})`,
+      {
+        requiresPayment: response.status === 402,
+        status: response.status,
+      },
+    );
+  }
+
   if (!response.ok) {
-    const err = await parseError(response);
-    throw new ApiError(err.message, {
-      requiresPayment: err.requiresPayment,
+    throw new ApiError(data.message || `Request failed (${response.status})`, {
+      requiresPayment:
+        response.status === 402 || Boolean(data.requiresPayment),
       status: response.status,
     });
   }
-  return response.json() as Promise<GenerateResult>;
+  return data;
+}
+
+export function resolveMockupImageSrc(result: GenerateResult): string | null {
+  return result.imageUrl || result.imageDataUrl || null;
+}
+
+export function resolveMockupLogoSrc(result: GenerateResult): string | null {
+  return result.logoUrl || result.logoDataUrl || null;
 }
 
 export async function createCheckoutSession(payload: {
