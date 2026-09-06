@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       { success: true, authenticated: true, user },
       {
         headers: {
-          'Set-Cookie': knowledgeSessionCookie(token),
+          'Set-Cookie': knowledgeSessionCookie(token, request),
         },
       },
     );
@@ -50,12 +50,12 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   return Response.json(
     { success: true, authenticated: false },
     {
       headers: {
-        'Set-Cookie': clearKnowledgeSessionCookie(),
+        'Set-Cookie': clearKnowledgeSessionCookie(request),
       },
     },
   );

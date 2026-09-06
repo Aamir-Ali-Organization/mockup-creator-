@@ -109,12 +109,30 @@ export function assertKnowledgeAdmin(request: Request) {
   throw new AppError('Unauthorized — sign in to manage knowledge', 401);
 }
 
-export function knowledgeSessionCookie(token: string) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+export function knowledgeSessionCookie(token: string, request?: Request) {
+  const secure = shouldUseSecureCookie(request) ? '; Secure' : '';
   return `${KNOWLEDGE_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}${secure}`;
 }
 
-export function clearKnowledgeSessionCookie() {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+export function clearKnowledgeSessionCookie(request?: Request) {
+  const secure = shouldUseSecureCookie(request) ? '; Secure' : '';
   return `${KNOWLEDGE_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+/** Secure cookies only work on HTTPS — Coolify sslip.io HTTP would drop them. */
+function shouldUseSecureCookie(request?: Request) {
+  if (request) {
+    const proto =
+      request.headers.get('x-forwarded-proto') ||
+      request.headers.get('x-forwarded-protocol') ||
+      '';
+    if (proto.split(',')[0]?.trim().toLowerCase() === 'https') return true;
+    if (proto.split(',')[0]?.trim().toLowerCase() === 'http') return false;
+    try {
+      if (new URL(request.url).protocol === 'https:') return true;
+    } catch {
+      // fall through
+    }
+  }
+  return process.env.NODE_ENV === 'production' && process.env.FORCE_INSECURE_COOKIES !== 'true';
 }
