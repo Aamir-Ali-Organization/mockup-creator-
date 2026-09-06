@@ -13,7 +13,7 @@ export default function GeneratePage() {
   return (
     <div className="tool-shell min-h-screen">
       <div className="border-b border-white/10 bg-void/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Link href="/" className="font-display text-2xl font-extrabold uppercase tracking-[0.06em] text-volt">
             Big Mad Drip
           </Link>

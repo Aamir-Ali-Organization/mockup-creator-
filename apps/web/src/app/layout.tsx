@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
-import { Barlow_Condensed, Outfit } from 'next/font/google';
+import { Figtree, Oswald } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
-const display = Barlow_Condensed({
-  weight: ['500', '600', '700', '800'],
+const display = Oswald({
+  weight: ['500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-display',
 });
 
-const body = Outfit({
+const body = Figtree({
   subsets: ['latin'],
   variable: '--font-body',
 });

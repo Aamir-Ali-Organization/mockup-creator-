@@ -3,16 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --void: #05070c;
-  --panel: #10151f;
-  --paper: #eef1f4;
-  --mist: #d7dde5;
-  --fog: #6b7382;
-  --volt: #d6ff3c;
-  --ember: #ff3b1f;
-  --ink: #05070c;
-  --accent: #d6ff3c;
-  --heat: #ff3b1f;
+  --void: #0a0a0a;
+  --panel: #141414;
+  --paper: #f6f5f2;
+  --mist: #ebeae6;
+  --fog: #6f6f6f;
+  --signal: #e10600;
+  --volt: #e10600;
+  --ember: #e10600;
+  --ink: #0a0a0a;
+  --accent: #e10600;
+  --heat: #e10600;
+  --snow: #ffffff;
 }
 
 html {
@@ -31,27 +33,35 @@ body {
 
 @layer components {
   .site-header {
-    @apply border-b border-void/10 bg-paper/90 backdrop-blur-xl;
+    @apply border-b border-black/5 bg-paper/85 backdrop-blur-xl;
   }
 
   .site-nav-link {
-    @apply rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-void/65 transition hover:bg-void/5 hover:text-void;
+    @apply px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-void/55 transition hover:text-void;
   }
 
   .btn-mockup {
-    @apply inline-flex items-center justify-center rounded-none bg-volt px-5 py-3 font-display text-xl font-extrabold uppercase tracking-[0.06em] text-void shadow-[6px_6px_0_0_#05070c] transition hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_#05070c] active:translate-y-0 active:shadow-[3px_3px_0_0_#05070c];
+    @apply inline-flex items-center justify-center bg-signal px-6 py-3.5 font-display text-[1.35rem] font-extrabold uppercase tracking-[0.08em] text-white transition duration-300 hover:bg-void;
+  }
+
+  .btn-mockup-invert {
+    @apply inline-flex items-center justify-center bg-white px-6 py-3.5 font-display text-[1.35rem] font-extrabold uppercase tracking-[0.08em] text-void transition duration-300 hover:bg-signal hover:text-white;
   }
 
   .btn-ghost-light {
-    @apply inline-flex items-center justify-center border border-paper/25 px-5 py-3 font-display text-lg font-bold uppercase tracking-[0.08em] text-paper transition hover:border-volt hover:text-volt;
+    @apply inline-flex items-center justify-center border border-white/30 px-6 py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] text-white transition hover:border-white hover:bg-white/5;
+  }
+
+  .btn-line {
+    @apply inline-flex items-center justify-center border border-void px-6 py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] text-void transition hover:bg-void hover:text-white;
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-none bg-volt px-6 py-3.5 font-display text-xl font-extrabold uppercase tracking-[0.06em] text-void shadow-[6px_6px_0_0_rgba(214,255,60,0.25)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0;
+    @apply inline-flex items-center justify-center bg-signal px-6 py-3.5 font-display text-xl font-extrabold uppercase tracking-[0.06em] text-white transition hover:bg-white hover:text-void disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center border border-white/20 bg-transparent px-5 py-3 font-semibold text-white/80 transition hover:border-volt/60 hover:text-volt disabled:opacity-50;
+    @apply inline-flex items-center justify-center border border-white/20 bg-transparent px-5 py-3 font-semibold text-white/80 transition hover:border-white/50 hover:text-white disabled:opacity-50;
   }
 
   .input-field {
@@ -63,7 +73,7 @@ body {
   }
 
   .input-field:focus {
-    @apply border-volt shadow-[0_0_0_4px_rgba(214,255,60,0.15)];
+    @apply border-signal shadow-[0_0_0_4px_rgba(225,6,0,0.18)];
   }
 
   .input-field option {
@@ -84,26 +94,25 @@ body {
   }
 
   .section-kicker {
-    @apply text-[11px] font-bold uppercase tracking-[0.28em] text-ember;
+    @apply text-[11px] font-semibold uppercase tracking-[0.32em] text-signal;
   }
 
   .section-title {
-    @apply font-display text-[clamp(2.6rem,8vw,5rem)] font-extrabold uppercase leading-[0.9] tracking-[0.02em] text-void;
+    @apply font-display text-[clamp(2.8rem,7vw,5.5rem)] font-black uppercase leading-[0.88] tracking-[-0.01em] text-void;
   }
 
   .tool-shell {
     color: #fff;
     background:
-      radial-gradient(ellipse 70% 45% at 50% -10%, rgba(214, 255, 60, 0.12), transparent 55%),
-      radial-gradient(ellipse 50% 40% at 100% 20%, rgba(255, 59, 31, 0.18), transparent 50%),
-      linear-gradient(180deg, #05070c 0%, #0e1219 45%, #070a10 100%);
+      radial-gradient(ellipse 60% 40% at 50% -5%, rgba(225, 6, 0, 0.18), transparent 55%),
+      linear-gradient(180deg, #0a0a0a 0%, #121212 50%, #0a0a0a 100%);
   }
 }
 
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
@@ -111,37 +120,48 @@ body {
   }
 }
 
-@keyframes slashIn {
+@keyframes riseSoft {
   from {
     opacity: 0;
-    clip-path: inset(0 40% 0 0);
-    transform: translateX(-12px);
+    transform: translateY(28px) scale(0.985);
   }
   to {
     opacity: 1;
-    clip-path: inset(0 0 0 0);
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes pulseVolt {
-  0%,
-  100% {
-    box-shadow: 6px 6px 0 0 #05070c;
+@keyframes marquee {
+  from {
+    transform: translateX(0);
   }
-  50% {
-    box-shadow: 10px 10px 0 0 #05070c, 0 0 0 6px rgba(214, 255, 60, 0.25);
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes lineReveal {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 
 .animate-fade-up {
-  animation: fadeUp 0.7s ease-out both;
+  animation: fadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.animate-slash-in {
-  animation: slashIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.animate-rise {
+  animation: riseSoft 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.animate-pulse-volt {
-  animation: pulseVolt 2.4s ease-in-out infinite;
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+
+.animate-line {
+  transform-origin: left center;
+  animation: lineReveal 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

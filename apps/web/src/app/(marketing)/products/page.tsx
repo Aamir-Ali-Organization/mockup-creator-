@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Products' };
 
 export default function ProductsPage() {
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-24">
+    <div className="mx-auto max-w-[1280px] px-4 py-16 sm:px-6 sm:py-24">
       <p className="section-kicker">Products</p>
       <h1 className="section-title mt-3 max-w-[14ch]">Gear for every sport</h1>
       <p className="mt-4 max-w-2xl text-void/65">

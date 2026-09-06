@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Packages' };
 
 export default function PackagesPage() {
   return (
-    <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-6 sm:py-24">
+    <div className="mx-auto max-w-[1280px] px-4 py-16 sm:px-6 sm:py-24">
       <p className="section-kicker">Flag football</p>
       <h1 className="section-title mt-3">Uniform packages</h1>
       <p className="mt-4 max-w-2xl text-void/65">
