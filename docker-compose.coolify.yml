@@ -1,0 +1,35 @@
+# Optional reference for Coolify (Dockerfile deploy is usually enough).
+# Storage: local disk via volume — leave BLOB_READ_WRITE_TOKEN empty.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1}
+      OPENAI_IMAGE_SIZE: ${OPENAI_IMAGE_SIZE:-1024x1024}
+      AUTO_GENERATE_MOCKUP: ${AUTO_GENERATE_MOCKUP:-true}
+      GHL_API_KEY: ${GHL_API_KEY}
+      GHL_LOCATION_ID: ${GHL_LOCATION_ID}
+      GHL_API_BASE: ${GHL_API_BASE:-https://services.leadconnectorhq.com}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_MOCKUP_AMOUNT_CENTS: ${STRIPE_MOCKUP_AMOUNT_CENTS:-1500}
+      IP_FREE_MOCKUP_LIMIT: ${IP_FREE_MOCKUP_LIMIT:-true}
+      KNOWLEDGE_ADMIN_USER: ${KNOWLEDGE_ADMIN_USER:-admin@admin.com}
+      KNOWLEDGE_ADMIN_PASSWORD: ${KNOWLEDGE_ADMIN_PASSWORD}
+      # Leave empty on Contabo — use mounted disk instead of Vercel Blob
+      BLOB_READ_WRITE_TOKEN: ""
+    volumes:
+      - mockup_web_data:/app/apps/web/data
+    restart: unless-stopped
+
+volumes:
+  mockup_web_data:
