@@ -15,7 +15,7 @@ const envSchema = z.object({
   GHL_FACEBOOK_LEAD_FIELD: z.string().default('facebook_lead_id'),
   GHL_MOCKUP_GENERATED_FIELD: z.string().default('mockup_generated'),
   GHL_MOCKUP_IMAGE_FIELD: z.string().default('mockup_image'),
-  /** Knowledge admin login (required for /admin/knowledge). */
+  /** Knowledge admin login (required for /app). */
   KNOWLEDGE_ADMIN_USER: z.string().default('admin@admin.com'),
   KNOWLEDGE_ADMIN_PASSWORD: z.string().default('Admin@123'),
   /** Optional legacy bearer secret for API clients. */

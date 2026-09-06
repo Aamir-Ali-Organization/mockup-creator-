@@ -218,8 +218,8 @@ export function SubmissionsAdminClient() {
             >
               {listQuery.isFetching ? 'Refreshing…' : 'Refresh'}
             </button>
-            <Link href="/admin/knowledge" className="btn-ghost !px-3 !py-2 text-xs">
-              Knowledge
+            <Link href="/app" className="btn-ghost !px-3 !py-2 text-xs">
+              Style Guide
             </Link>
             <button
               type="button"

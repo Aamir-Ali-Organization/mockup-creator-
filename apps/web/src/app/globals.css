@@ -3,9 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --ink: #101418;
-  --accent: #ffd400;
-  --heat: #e30613;
+  --void: #05070c;
+  --panel: #10151f;
+  --paper: #eef1f4;
+  --mist: #d7dde5;
+  --fog: #6b7382;
+  --volt: #d6ff3c;
+  --ember: #ff3b1f;
+  --ink: #05070c;
+  --accent: #d6ff3c;
+  --heat: #ff3b1f;
 }
 
 html {
@@ -17,15 +24,36 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  font-family: var(--font-sora), sans-serif;
-  color: #fff;
-  background:
-    radial-gradient(ellipse 70% 45% at 50% -10%, rgba(255, 212, 0, 0.16), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 20%, rgba(227, 6, 19, 0.22), transparent 50%),
-    linear-gradient(180deg, #0a0a0c 0%, #141018 45%, #0d0d10 100%);
+  font-family: var(--font-body), sans-serif;
+  color: var(--void);
+  background: var(--paper);
 }
 
 @layer components {
+  .site-header {
+    @apply border-b border-void/10 bg-paper/90 backdrop-blur-xl;
+  }
+
+  .site-nav-link {
+    @apply rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-void/65 transition hover:bg-void/5 hover:text-void;
+  }
+
+  .btn-mockup {
+    @apply inline-flex items-center justify-center rounded-none bg-volt px-5 py-3 font-display text-xl font-extrabold uppercase tracking-[0.06em] text-void shadow-[6px_6px_0_0_#05070c] transition hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_#05070c] active:translate-y-0 active:shadow-[3px_3px_0_0_#05070c];
+  }
+
+  .btn-ghost-light {
+    @apply inline-flex items-center justify-center border border-paper/25 px-5 py-3 font-display text-lg font-bold uppercase tracking-[0.08em] text-paper transition hover:border-volt hover:text-volt;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-none bg-volt px-6 py-3.5 font-display text-xl font-extrabold uppercase tracking-[0.06em] text-void shadow-[6px_6px_0_0_rgba(214,255,60,0.25)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center border border-white/20 bg-transparent px-5 py-3 font-semibold text-white/80 transition hover:border-volt/60 hover:text-volt disabled:opacity-50;
+  }
+
   .input-field {
     @apply w-full max-w-full appearance-none rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3.5 text-base font-medium text-white outline-none transition placeholder:text-white/35;
   }
@@ -35,7 +63,7 @@ body {
   }
 
   .input-field:focus {
-    @apply border-accent shadow-[0_0_0_4px_rgba(255,212,0,0.15)];
+    @apply border-volt shadow-[0_0_0_4px_rgba(214,255,60,0.15)];
   }
 
   .input-field option {
@@ -46,14 +74,6 @@ body {
     @apply text-xs font-semibold uppercase tracking-wide text-white/55;
   }
 
-  .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-accent px-6 py-3.5 font-display text-xl tracking-wide text-ink shadow-[0_10px_28px_rgba(255,212,0,0.28)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-full border border-white/20 bg-transparent px-5 py-3 font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:opacity-50;
-  }
-
   .color-swatch-row {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -62,15 +82,66 @@ body {
   .color-swatch-row::-webkit-scrollbar {
     display: none;
   }
+
+  .section-kicker {
+    @apply text-[11px] font-bold uppercase tracking-[0.28em] text-ember;
+  }
+
+  .section-title {
+    @apply font-display text-[clamp(2.6rem,8vw,5rem)] font-extrabold uppercase leading-[0.9] tracking-[0.02em] text-void;
+  }
+
+  .tool-shell {
+    color: #fff;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% -10%, rgba(214, 255, 60, 0.12), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 100% 20%, rgba(255, 59, 31, 0.18), transparent 50%),
+      linear-gradient(180deg, #05070c 0%, #0e1219 45%, #070a10 100%);
+  }
 }
 
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes slashIn {
+  from {
+    opacity: 0;
+    clip-path: inset(0 40% 0 0);
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseVolt {
+  0%,
+  100% {
+    box-shadow: 6px 6px 0 0 #05070c;
+  }
+  50% {
+    box-shadow: 10px 10px 0 0 #05070c, 0 0 0 6px rgba(214, 255, 60, 0.25);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.7s ease-out both;
+}
+
+.animate-slash-in {
+  animation: slashIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-pulse-volt {
+  animation: pulseVolt 2.4s ease-in-out infinite;
 }

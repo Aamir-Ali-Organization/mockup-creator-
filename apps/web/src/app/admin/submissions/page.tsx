@@ -1,11 +1,5 @@
-import type { Metadata } from 'next';
-import { SubmissionsAdminClient } from '@/components/SubmissionsAdminClient';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Submissions — Big Mad Drip',
-  robots: { index: false, follow: false },
-};
-
-export default function SubmissionsAdminPage() {
-  return <SubmissionsAdminClient />;
+export default function LegacyAdminSubmissionsPage() {
+  redirect('/app/submissions');
 }

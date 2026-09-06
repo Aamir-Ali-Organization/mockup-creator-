@@ -9,14 +9,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#101418',
-        accent: '#ffd400',
-        heat: '#e30613',
-        field: '#c4121a',
+        void: '#05070c',
+        panel: '#10151f',
+        paper: '#eef1f4',
+        mist: '#d7dde5',
+        fog: '#6b7382',
+        volt: '#d6ff3c',
+        ember: '#ff3b1f',
+        ink: '#05070c',
+        accent: '#d6ff3c',
+        heat: '#ff3b1f',
+        field: '#ff3b1f',
       },
       fontFamily: {
-        display: ['var(--font-bebas)', 'sans-serif'],
-        body: ['var(--font-sora)', 'sans-serif'],
+        display: ['var(--font-display)', 'sans-serif'],
+        body: ['var(--font-body)', 'sans-serif'],
       },
       keyframes: {
         shimmer: {

@@ -351,8 +351,8 @@ export function SuccessClient({ contactId: contactIdFromRoute }: SuccessClientPr
           <p className="mt-3 text-sm text-white/60">
             Submit the quote form first — your mockup session is tied to the GHL lead id in this URL.
           </p>
-          <Link href="/" className="btn-primary mt-6 inline-flex">
-            Start a quote
+          <Link href="/generate" className="btn-primary mt-6 inline-flex">
+            Generate Mockup
           </Link>
         </div>
       </div>

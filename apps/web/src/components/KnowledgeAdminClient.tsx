@@ -600,7 +600,7 @@ export function KnowledgeAdminClient() {
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link href="/admin/submissions" className="btn-ghost !px-3 !py-2 text-xs">
+            <Link href="/app/submissions" className="btn-ghost !px-3 !py-2 text-xs">
               Submissions
             </Link>
             {adminView === 'sports' && isDirty && (

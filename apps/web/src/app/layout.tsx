@@ -1,28 +1,35 @@
 import type { Metadata } from 'next';
-import { Bebas_Neue, Sora } from 'next/font/google';
+import { Barlow_Condensed, Outfit } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
-const bebas = Bebas_Neue({
-  weight: '400',
+const display = Barlow_Condensed({
+  weight: ['500', '600', '700', '800'],
   subsets: ['latin'],
-  variable: '--font-bebas',
+  variable: '--font-display',
 });
 
-const sora = Sora({
+const body = Outfit({
   subsets: ['latin'],
-  variable: '--font-sora',
+  variable: '--font-body',
 });
 
 export const metadata: Metadata = {
-  title: 'Quote Request — Big Mad Drip',
-  description: 'Custom team uniforms with free AI mockup preview.',
+  title: {
+    default: 'Big Mad Drip — Sports Apparel Made With Attitude',
+    template: '%s · Big Mad Drip',
+  },
+  description:
+    'Florida-based custom sports apparel. Generate a free AI uniform mockup, then gear up with Big Mad Drip.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${bebas.variable} ${sora.variable} font-body antialiased`}>
+      <body
+        className={`${display.variable} ${body.variable} font-body antialiased`}
+        suppressHydrationWarning
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

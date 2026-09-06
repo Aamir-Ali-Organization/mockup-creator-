@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function LegacyAdminKnowledgePage() {
+export default function LegacyAppKnowledgePage() {
   redirect('/app');
 }
